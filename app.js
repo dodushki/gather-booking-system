@@ -1,9 +1,15 @@
 (function () {
   "use strict";
   const Booking = window.GatherBooking;
-  const state = loadState();
   const ACCOUNTS_KEY = "gather-local-accounts-v1";
   const SESSION_KEY = "gather-local-session-v1";
+  const ACCOUNT_RESET_KEY = "gather-account-reset-v1";
+  if (localStorage.getItem(ACCOUNT_RESET_KEY) !== "done") {
+    localStorage.removeItem(ACCOUNTS_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.setItem(ACCOUNT_RESET_KEY, "done");
+  }
+  const state = loadState();
   const accounts = loadAccounts();
   let currentUser = loadSession();
   const $ = (selector, scope) => (scope || document).querySelector(selector);
