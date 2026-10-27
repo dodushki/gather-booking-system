@@ -70,6 +70,12 @@
     return guests;
   }
 
+  function validateGuestName(value) {
+    const name = String(value || "").trim();
+    if (name.length < 2 || name.length > 80) throw new Error("Enter a name between 2 and 80 characters.");
+    return name;
+  }
+
   function isAvailable(offering, checkin, checkout, bookings, guests, now) {
     const arrival = parseDate(checkin);
     const departure = parseDate(checkout);
@@ -127,5 +133,5 @@
     return booking;
   }
 
-  return { STORAGE_KEY, DAY_NAMES, DEFAULT_OFFERINGS, createInitialState, withDefaultOfferings, parseDate, toDateString, addDays, getNights, getSearchGuestCount, isAvailable, createBooking };
+  return { STORAGE_KEY, DAY_NAMES, DEFAULT_OFFERINGS, createInitialState, withDefaultOfferings, parseDate, toDateString, addDays, getNights, getSearchGuestCount, validateGuestName, isAvailable, createBooking };
 });

@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell" id="app-shell" inert aria-hidden="true">
       <header class="topbar">
         <a class="brand" href="#home" aria-label="Gather home" data-tab-link="home"><span class="brand-mark" aria-hidden="true">g</span><span>gather<span class="brand-period">.</span></span></a>
         <nav class="main-nav" aria-label="Main navigation">
@@ -23,6 +23,11 @@
           <button type="button" class="profile-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown"><span class="profile-dot" aria-hidden="true">G</span><span id="account-button-label">Sign in</span></button>
         </div>
       </header>
+      <aside class="demo-mode-notice" aria-label="Presentation demo notice">
+        <span class="demo-mode-dot" aria-hidden="true"></span>
+        <span><strong>Presentation demo</strong> · Sample stays and prices; bookings are not real.</span>
+        <button type="button" id="show-demo-disclaimer">Demo details</button>
+      </aside>
 
       <main>
         <section class="view active" id="home-view" aria-labelledby="home-title">
@@ -129,6 +134,31 @@
       </main>
     </div>
 
+    <div class="welcome-backdrop" id="welcome-gate">
+      <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-disclaimer">
+        <span class="welcome-mark" aria-hidden="true">g</span>
+        <p class="eyebrow">GATHER · PRESENTATION DEMO</p>
+        <h1 id="welcome-title">A good trip starts with knowing what’s real.</h1>
+        <p class="welcome-intro" id="welcome-disclaimer">Gather is a student-built demo inspired by booking experiences, with sample stays across the Philippines.</p>
+        <div class="demo-disclosure">
+          <strong>Before you explore</strong>
+          <ul>
+            <li>Listings, nightly prices, and ratings are examples—not live offers.</li>
+            <li>Bookings made here are shared demo records only. They can temporarily block dates for other presenters, but no host is contacted, no stay is arranged, and no payment is collected.</li>
+            <li>We save the name you enter and your demo activity in Gather’s shared database. No email or password is needed for a guest session; it stays on this browser.</li>
+          </ul>
+        </div>
+        <form class="guest-entry-form" id="guest-entry-form">
+          <label for="guest-display-name">What should we call you?</label>
+          <input id="guest-display-name" name="name" required minlength="2" maxlength="80" autocomplete="name" placeholder="Enter your name">
+          <p class="form-error hidden" id="guest-entry-error" role="alert"></p>
+          <button class="button button-dark welcome-primary" id="guest-entry-submit" type="submit">Continue as a guest <span aria-hidden="true">→</span></button>
+        </form>
+        <button class="button button-dark welcome-primary hidden" id="welcome-continue-session" type="button"></button>
+        <p class="welcome-status" id="welcome-status" role="status">Connecting to Gather’s shared demo…</p>
+        <p class="welcome-signin">Already have a Gather account? <button type="button" id="welcome-signin">Sign in</button></p>
+      </section>
+    </div>
     <div class="modal-backdrop hidden" id="booking-modal" aria-hidden="true"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button type="button" class="modal-close" data-close-modal aria-label="Close dialog">×</button><div id="modal-content"></div></section></div>
     <div class="confirmation-backdrop hidden" id="confirmation-modal" aria-hidden="true"><section class="confirmation-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" aria-describedby="confirmation-message"><span class="confirmation-mark" aria-hidden="true">?</span><h2 id="confirmation-title"></h2><p id="confirmation-message"></p><div class="confirmation-actions"><button type="button" class="button button-outline" data-confirm-cancel>Go back</button><button type="button" class="button button-dark" data-confirm-accept>Confirm</button></div></section></div>
     <div class="account-dropdown hidden" id="account-dropdown"></div>

@@ -12,9 +12,9 @@
     return result.data;
   }
 
-  function fromProfile(row) {
+  function fromProfile(row, isAnonymous) {
     if (!row) return null;
-    return { id: row.id, name: row.name, email: row.email, role: row.role };
+    return { id: row.id, name: row.name, email: row.email, role: row.role, isAnonymous: Boolean(isAnonymous) };
   }
 
   function fromOffering(row) {
@@ -63,9 +63,9 @@
     };
   }
 
-  async function getProfile(userId) {
+  async function getProfile(userId, isAnonymous) {
     const result = await client.from("profiles").select("id,name,email,role").eq("id", userId).single();
-    return fromProfile(throwIfError(result));
+    return fromProfile(throwIfError(result), isAnonymous);
   }
 
   async function loadData(user) {
@@ -98,7 +98,7 @@
     });
     const data = throwIfError(result);
     return {
-      profile: data.session && data.user ? await getProfile(data.user.id) : null,
+      profile: data.session && data.user ? await getProfile(data.user.id, data.user.is_anonymous) : null,
       needsEmailConfirmation: !data.session
     };
   }
@@ -106,7 +106,17 @@
   async function signIn({ email, password }) {
     const result = await client.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     const data = throwIfError(result);
-    return getProfile(data.user.id);
+    return getProfile(data.user.id, data.user.is_anonymous);
+  }
+
+  async function signInAnonymously(name) {
+    const guestName = window.GatherBooking.validateGuestName(name);
+    const result = await client.auth.signInAnonymously({
+      options: { data: { name: guestName, role: "guest" } }
+    });
+    const data = throwIfError(result);
+    if (!data.user) throw new Error("Gather could not start a guest session.");
+    return getProfile(data.user.id, true);
   }
 
   async function signOut() {
@@ -115,14 +125,14 @@
 
   async function getCurrentProfile() {
     const session = throwIfError(await client.auth.getSession()).session;
-    return session ? getProfile(session.user.id) : null;
+    return session ? getProfile(session.user.id, session.user.is_anonymous) : null;
   }
 
   function onAuthStateChange(callback) {
     return client.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") callback(null);
       else if (session && ["SIGNED_IN", "TOKEN_REFRESHED", "USER_UPDATED"].includes(event)) {
-        window.setTimeout(() => getProfile(session.user.id).then(callback).catch((error) => {
+        window.setTimeout(() => getProfile(session.user.id, session.user.is_anonymous).then(callback).catch((error) => {
           console.error("Could not load the signed-in Gather profile.", error);
         }), 0);
       }
@@ -182,7 +192,7 @@
   }
 
   window.GatherSupabase = Object.freeze({
-    client, getCurrentProfile, loadData, signUp, signIn, signOut, onAuthStateChange,
+    client, getCurrentProfile, loadData, signUp, signIn, signInAnonymously, signOut, onAuthStateChange,
     createBooking, cancelBooking, saveOffering, uploadListingImage, deleteListingImage,
     deleteOffering, setFavorite
   });

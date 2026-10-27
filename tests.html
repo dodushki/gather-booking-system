@@ -13,7 +13,7 @@
   </head>
   <body>
     <h1>Stay booking checks</h1>
-    <p>Focused browser-native tests for booking rules, shared Supabase listings and photo uploads, custom guest counts, EmailJS notifications, and the Philippines map asset.</p>
+    <p>Focused browser-native tests for booking rules, presentation guest access, shared Supabase listings and photo uploads, custom guest counts, EmailJS notifications, and the Philippines map asset.</p>
     <ol id="results"></ol>
     <p id="summary" role="status"></p>
     <script src="booking.js"></script>
@@ -77,6 +77,11 @@
           throws(() => api.getSearchGuestCount("custom", "21"), "between 1 and 20");
           throws(() => api.getSearchGuestCount("custom", "8"), "between 1 and 20");
         });
+        test("trims and validates presentation guest names", function () {
+          assert(api.validateGuestName("  Jamie Lee  ") === "Jamie Lee", "Guest names should be trimmed before saving");
+          throws(() => api.validateGuestName(" "), "between 2 and 80");
+          throws(() => api.validateGuestName("x".repeat(81)), "between 2 and 80");
+        });
         test("starts with sample stays across Philippine destinations and PHP prices", function () {
           assert(state.offerings.length === 8, "Should include eight sample stays");
           assert(state.offerings.every((offering) => offering.rating >= 1 && offering.rating <= 5), "Sample stay ratings should use a five-point scale");
@@ -135,6 +140,48 @@
           throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin: "2030-01-05", checkout, guests: 2, name: "Alex Doe", email: "alex@example.com" }, now), "future");
         });
         async function finish() {
+          await testAsync("starts a shared anonymous guest session with the entered name", async function () {
+            const client = window.GatherSupabase.client;
+            const originalSignInAnonymously = client.auth.signInAnonymously;
+            const originalFrom = client.from;
+            let authOptions = null;
+            client.auth.signInAnonymously = async function (options) {
+              authOptions = options;
+              return { data: { user: { id: "guest-test", is_anonymous: true } }, error: null };
+            };
+            client.from = function (table) {
+              assert(table === "profiles", "Guest sign-in should load the profile created by the auth trigger");
+              return {
+                select: function () { return this; },
+                eq: function (column, value) {
+                  assert(column === "id" && value === "guest-test", "Should load only the new guest profile");
+                  return this;
+                },
+                single: async function () {
+                  return { data: { id: "guest-test", name: "Jamie Lee", email: null, role: "guest" }, error: null };
+                }
+              };
+            };
+            try {
+              const account = await window.GatherSupabase.signInAnonymously("  Jamie Lee  ");
+              assert(account.id === "guest-test" && account.name === "Jamie Lee", "Should return the created guest profile");
+              assert(account.role === "guest" && account.isAnonymous && account.email === null, "Guest profile should be anonymous and require no email");
+              assert(authOptions.options.data.name === "Jamie Lee" && authOptions.options.data.role === "guest", "Should save the trimmed guest name as guest metadata");
+            } finally {
+              client.auth.signInAnonymously = originalSignInAnonymously;
+              client.from = originalFrom;
+            }
+          });
+          await testAsync("shows the demo disclaimer and required guest name before app access", async function () {
+            const response = await fetch("./index.html");
+            assert(response.ok, "The app page should be available");
+            const markup = await response.text();
+            assert(markup.includes('id="welcome-gate"') && markup.includes('aria-modal="true"'), "The welcome disclaimer should be a modal gate");
+            assert(markup.includes('id="app-shell" inert aria-hidden="true"'), "The app should be inaccessible until the guest acknowledges the gate");
+            assert(markup.includes('id="guest-display-name" name="name" required minlength="2" maxlength="80"'), "Guest entry should require a bounded display name");
+            assert(markup.includes("no payment is collected") && markup.includes("no host is contacted"), "The disclaimer should clearly state that demo bookings are not real");
+            assert(markup.includes('id="show-demo-disclaimer"') && markup.includes("Presentation demo") && markup.includes("Sample stays and prices; bookings are not real."), "A persistent demo notice should remain available after the welcome gate closes");
+          });
           await testAsync("loads shared Philippine stays and public availability from Supabase", async function () {
             const shared = await window.GatherSupabase.loadData(null);
             assert(shared.offerings.length >= 8, "Supabase should return all starter stays, even when hosts have added more");

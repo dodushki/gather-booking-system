@@ -3,7 +3,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   name text not null check (char_length(name) between 2 and 80),
-  email text not null,
+  email text,
   role text not null check (role in ('guest', 'host')),
   created_at timestamptz not null default now()
 );
@@ -49,7 +49,7 @@ create table if not exists public.bookings (
   price integer not null check (price > 0),
   total integer not null check (total > 0),
   guest_name text not null,
-  guest_email text not null,
+  guest_email text,
   notes text not null default '',
   status text not null default 'confirmed' check (status in ('confirmed', 'cancelled')),
   created_at timestamptz not null default now(),
@@ -59,6 +59,8 @@ create table if not exists public.bookings (
 );
 
 alter table public.bookings alter column offering_id drop not null;
+alter table public.profiles alter column email drop not null;
+alter table public.bookings alter column guest_email drop not null;
 alter table public.bookings drop constraint if exists bookings_offering_id_fkey;
 alter table public.bookings
   add constraint bookings_offering_id_fkey
@@ -88,7 +90,11 @@ begin
   insert into public.profiles (id, name, email, role)
   values (
     new.id,
-    coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), split_part(new.email, '@', 1)),
+    coalesce(
+      nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
+      nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+      'Gather guest'
+    ),
     lower(new.email),
     case when requested_role = 'host' then 'host' else 'guest' end
   );
