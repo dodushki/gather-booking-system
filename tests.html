@@ -13,7 +13,7 @@
   </head>
   <body>
     <h1>Stay booking checks</h1>
-    <p>Focused browser-native tests for booking rules, shared Supabase listings, EmailJS notifications, and the Philippines map asset.</p>
+    <p>Focused browser-native tests for booking rules, shared Supabase listings and photo uploads, custom guest counts, EmailJS notifications, and the Philippines map asset.</p>
     <ol id="results"></ol>
     <p id="summary" role="status"></p>
     <script src="booking.js"></script>
@@ -70,6 +70,12 @@
         test("calculates local-calendar nights across month boundaries", function () {
           assert(api.getNights("2030-01-30", "2030-02-02") === 3, "Should count three nights");
           assert(api.getNights("2030-02-02", "2030-01-30") === 0, "Checkout cannot precede check-in");
+        });
+        test("accepts custom search guest counts from 9 through 20", function () {
+          assert(api.getSearchGuestCount("8") === 8, "Should preserve standard guest choices");
+          assert(api.getSearchGuestCount("custom", "12") === 12, "Should return the requested custom count");
+          throws(() => api.getSearchGuestCount("custom", "21"), "between 1 and 20");
+          throws(() => api.getSearchGuestCount("custom", "8"), "between 1 and 20");
         });
         test("starts with sample stays across Philippine destinations and PHP prices", function () {
           assert(state.offerings.length === 8, "Should include eight sample stays");
@@ -131,10 +137,43 @@
         async function finish() {
           await testAsync("loads shared Philippine stays and public availability from Supabase", async function () {
             const shared = await window.GatherSupabase.loadData(null);
-            assert(shared.offerings.length === 8, "Supabase should return all eight starter stays");
+            assert(shared.offerings.length >= 8, "Supabase should return all starter stays, even when hosts have added more");
             assert(shared.offerings.some((offering) => offering.id === "isla-norte"), "Supabase should include the Siargao sample stay");
             assert(shared.bookings.length === 0 && shared.favorites.length === 0, "Signed-out loading must not expose private bookings or favorites");
             assert(Array.isArray(shared.unavailableDates), "Public availability should be returned separately from private booking details");
+          });
+          await testAsync("uploads listing photos to the host-owned public storage path", async function () {
+            const storage = window.GatherSupabase.client.storage;
+            const originalFrom = storage.from;
+            let uploaded = null;
+            storage.from = function (bucket) {
+              return {
+                upload: async function (path, file, options) {
+                  uploaded = { bucket, path, type: file.type, options };
+                  return { data: { path }, error: null };
+                },
+                getPublicUrl: function (path) {
+                  return { data: { publicUrl: `https://photos.example/${bucket}/${path}` } };
+                }
+              };
+            };
+            try {
+              const file = new File(["photo"], "stay.png", { type: "image/png" });
+              const result = await window.GatherSupabase.uploadListingImage(file, "host-123", "stay-demo");
+              assert(uploaded.bucket === "listing-photos", "Should use the listing photo bucket");
+              assert(uploaded.path.startsWith("host-123/stay-demo/") && uploaded.path.endsWith(".png"), "Photo path should be scoped to its host and listing");
+              assert(uploaded.options.upsert === false && uploaded.type === "image/png", "Upload should preserve the image type without overwriting another image");
+              assert(result.url.endsWith(uploaded.path), "Should return a public URL for the uploaded image");
+              let invalidImageRejected = false;
+              try {
+                await window.GatherSupabase.uploadListingImage(new File(["image"], "stay.svg", { type: "image/svg+xml" }), "host-123", "stay-demo");
+              } catch (error) {
+                invalidImageRejected = error.message.includes("JPG, PNG, or WebP");
+              }
+              assert(invalidImageRejected, "Should reject unsupported image formats");
+            } finally {
+              storage.from = originalFrom;
+            }
           });
           await testAsync("sends booking details to EmailJS with configured credentials", async function () {
             const previousConfig = window.GATHER_EMAIL_CONFIG;

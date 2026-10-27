@@ -150,6 +150,26 @@
     return fromOffering(throwIfError(result));
   }
 
+  async function uploadListingImage(file, userId, offeringId) {
+    const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+    const extension = extensions[file.type];
+    if (!extension || file.size > 5 * 1024 * 1024) {
+      throw new Error("Choose a JPG, PNG, or WebP image smaller than 5 MB.");
+    }
+    const safeOfferingId = String(offeringId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const path = `${userId}/${safeOfferingId}/${window.crypto.randomUUID()}.${extension}`;
+    const result = await client.storage.from("listing-photos").upload(path, file, {
+      cacheControl: "3600", contentType: file.type, upsert: false
+    });
+    throwIfError(result);
+    const { data } = client.storage.from("listing-photos").getPublicUrl(path);
+    return { path, url: data.publicUrl };
+  }
+
+  async function deleteListingImage(path) {
+    throwIfError(await client.storage.from("listing-photos").remove([path]));
+  }
+
   async function deleteOffering(offeringId) {
     return throwIfError(await client.rpc("delete_offering", { p_offering_id: offeringId }));
   }
@@ -163,6 +183,7 @@
 
   window.GatherSupabase = Object.freeze({
     client, getCurrentProfile, loadData, signUp, signIn, signOut, onAuthStateChange,
-    createBooking, cancelBooking, saveOffering, deleteOffering, setFavorite
+    createBooking, cancelBooking, saveOffering, uploadListingImage, deleteListingImage,
+    deleteOffering, setFavorite
   });
 })();

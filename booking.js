@@ -62,6 +62,14 @@
     return (Date.UTC(endYear, endMonth - 1, endDay) - Date.UTC(startYear, startMonth - 1, startDay)) / 86400000;
   }
 
+  function getSearchGuestCount(selection, customCount) {
+    const guests = Number(selection === "custom" ? customCount : selection);
+    if (!Number.isInteger(guests) || (selection === "custom" ? guests < 9 || guests > 20 : guests < 1 || guests > 8)) {
+      throw new Error("Choose between 1 and 20 guests.");
+    }
+    return guests;
+  }
+
   function isAvailable(offering, checkin, checkout, bookings, guests, now) {
     const arrival = parseDate(checkin);
     const departure = parseDate(checkout);
@@ -119,5 +127,5 @@
     return booking;
   }
 
-  return { STORAGE_KEY, DAY_NAMES, DEFAULT_OFFERINGS, createInitialState, withDefaultOfferings, parseDate, toDateString, addDays, getNights, isAvailable, createBooking };
+  return { STORAGE_KEY, DAY_NAMES, DEFAULT_OFFERINGS, createInitialState, withDefaultOfferings, parseDate, toDateString, addDays, getNights, getSearchGuestCount, isAvailable, createBooking };
 });

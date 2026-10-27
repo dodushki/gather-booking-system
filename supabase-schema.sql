@@ -157,6 +157,38 @@ create policy "Users can remove their own favorites"
   on public.favorites for delete to authenticated
   using (user_id = (select auth.uid()));
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('listing-photos', 'listing-photos', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Gather listing photos are publicly readable" on storage.objects;
+create policy "Gather listing photos are publicly readable"
+  on storage.objects for select to anon, authenticated
+  using (bucket_id = 'listing-photos');
+
+drop policy if exists "Hosts can upload Gather listing photos" on storage.objects;
+create policy "Hosts can upload Gather listing photos"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'listing-photos'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and exists (
+      select 1 from public.profiles p
+      where p.id = (select auth.uid()) and p.role = 'host'
+    )
+  );
+
+drop policy if exists "Hosts can remove their Gather listing photos" on storage.objects;
+create policy "Hosts can remove their Gather listing photos"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'listing-photos'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
 create or replace function public.get_unavailable_dates()
 returns table (offering_id text, checkin date, checkout date)
 language sql

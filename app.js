@@ -29,13 +29,16 @@
   if (initialCheckout && Booking.parseDate(initialCheckout) && initialCheckout > searchCheckin) {
     searchCheckout = initialCheckout;
   }
-  if (Number.isInteger(initialGuests) && initialGuests >= 1 && initialGuests <= 8) searchGuests = initialGuests;
+  if (Number.isInteger(initialGuests) && initialGuests >= 1 && initialGuests <= 20) searchGuests = initialGuests;
   searchTerm = (initialSearchParams.get("destination") || "").trim().slice(0, 100);
   let activeOfferingId = null;
   let editingOfferingId = null;
   let authIntent = null;
   let toastTimer;
   let stayMap = null;
+  let propertyPickerMap = null;
+  let propertyPickerMarker = null;
+  let listingImagePreviewUrl = null;
   let countryBoundary = null;
   let mapPopupCloseTimer = null;
   let mappedMapOfferings = [];
@@ -55,7 +58,12 @@
       $('[data-search-field="checkin"]', form).min = minDate;
       $('[data-search-field="checkout"]', form).value = searchCheckout;
       $('[data-search-field="checkout"]', form).min = Booking.addDays(searchCheckin, 1);
-      $('[data-search-field="guests"]', form).value = String(searchGuests);
+      const guestSelect = $('[data-search-field="guests"]', form);
+      const customGuestCount = $('[data-search-field="custom-guests"]', form);
+      guestSelect.value = searchGuests > 8 ? "custom" : String(searchGuests);
+      customGuestCount.value = searchGuests > 8 ? String(searchGuests) : "";
+      customGuestCount.hidden = searchGuests <= 8;
+      customGuestCount.required = searchGuests > 8;
     });
   }
   syncSearchForms();
@@ -89,6 +97,7 @@
   }
 
   function photoUrl(image, width) {
+    if (/^https?:\/\//i.test(String(image || ""))) return image;
     return `https://images.unsplash.com/${encodeURIComponent(image || "photo-1449158743715-0a90ebb6d2d8")}?auto=format&fit=crop&w=${width || 900}&q=80`;
   }
 
@@ -655,8 +664,66 @@
     elements.modal.classList.add("hidden");
     elements.modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
+    if (propertyPickerMap) {
+      propertyPickerMap.remove();
+      propertyPickerMap = null;
+      propertyPickerMarker = null;
+    }
+    if (listingImagePreviewUrl) {
+      URL.revokeObjectURL(listingImagePreviewUrl);
+      listingImagePreviewUrl = null;
+    }
     activeOfferingId = null;
     editingOfferingId = null;
+  }
+
+  function setPropertyPickerLocation(latitude, longitude) {
+    const latitudeField = $('[name="latitude"]', elements.modalContent);
+    const longitudeField = $('[name="longitude"]', elements.modalContent);
+    const message = $("#property-map-message");
+    latitudeField.value = Number(latitude).toFixed(5);
+    longitudeField.value = Number(longitude).toFixed(5);
+    if (!propertyPickerMarker) {
+      propertyPickerMarker = window.L.marker([latitude, longitude]).addTo(propertyPickerMap);
+    } else {
+      propertyPickerMarker.setLatLng([latitude, longitude]);
+    }
+    message.textContent = `Pin selected: ${latitudeField.value}, ${longitudeField.value}.`;
+  }
+
+  function initializePropertyPickerMap(value) {
+    const mapElement = $("#property-location-map");
+    const message = $("#property-map-message");
+    if (propertyPickerMap) propertyPickerMap.remove();
+    if (!window.L) {
+      message.textContent = "The map needs an internet connection. You can enter coordinates above instead.";
+      return;
+    }
+    const hasLocation = value.latitude !== null && value.latitude !== undefined &&
+      value.longitude !== null && value.longitude !== undefined &&
+      Number.isFinite(Number(value.latitude)) && Number.isFinite(Number(value.longitude));
+    const center = hasLocation ? [Number(value.latitude), Number(value.longitude)] : [12.5, 122];
+    propertyPickerMap = window.L.map(mapElement, {
+      scrollWheelZoom: true,
+      minZoom: 5,
+      maxZoom: 15,
+      maxBounds: philippinesBounds,
+      maxBoundsViscosity: 1
+    }).setView(center, hasLocation ? 12 : 5);
+    const tiles = window.L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+      minZoom: 5,
+      maxZoom: 15,
+      attribution: 'Tiles &copy; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(propertyPickerMap);
+    tiles.on("tileerror", () => { message.textContent = "Map tiles could not load. Check your internet connection or enter coordinates above."; });
+    propertyPickerMap.on("click", (event) => setPropertyPickerLocation(event.latlng.lat, event.latlng.lng));
+    if (hasLocation) {
+      propertyPickerMarker = window.L.marker(center).addTo(propertyPickerMap);
+      message.textContent = "Tap to move the approximate public pin. Drag to pan; scroll or pinch to zoom.";
+    } else {
+      message.textContent = "Tap to drop a pin. Drag to pan; scroll or pinch to zoom.";
+    }
+    window.setTimeout(() => propertyPickerMap && propertyPickerMap.invalidateSize(), 0);
   }
 
   function openOfferingForm(offering) {
@@ -669,17 +736,44 @@
     elements.modalContent.innerHTML = `<div class="modal-heading form-modal-heading"><span class="modal-kicker">GATHER HOSTS · ${offering ? "YOUR LISTING" : "A NEW PLACE"}</span><h2 id="modal-title">${offering ? "A little" : "Put your place"} <em>${offering ? "update." : "on the map."}</em></h2><p>Share the details guests need to find their way to you.</p></div>
     <form class="offering-form" id="offering-form"><div class="form-grid"><label>Place name<input name="name" required maxlength="80" value="${escapeHtml(value.name)}" placeholder="e.g. A Little House in the Islands"></label><label>Stay type<select name="category">${["Island stays", "Beachfront stays", "Mountain escapes", "City hotels", "Serviced apartments", "Heritage inns", "Farm stays", "City hideaways", "Nature retreats", "Other"].map((item) => `<option${item === value.category ? " selected" : ""}>${item}</option>`).join("")}</select></label></div>
       <label>Description<textarea name="description" rows="2" required maxlength="240" placeholder="What makes it feel like yours?">${escapeHtml(value.description)}</textarea></label>
-      <div class="form-grid"><label>Location<input name="location" required maxlength="100" value="${escapeHtml(value.location)}" placeholder="Island, town, province"></label><label>Photo URL path<input name="image" required maxlength="100" value="${escapeHtml(value.image)}" placeholder="Unsplash photo ID"></label></div>
-      <div class="form-grid"><label>Map latitude <span class="field-help">Optional; use an approximate public location</span><input name="latitude" type="number" min="4" max="22" step=".0001" value="${value.latitude !== undefined && value.latitude !== null && Number.isFinite(Number(value.latitude)) ? Number(value.latitude) : ""}" placeholder="e.g. 14.5547"></label><label>Map longitude <span class="field-help">Optional; use an approximate public location</span><input name="longitude" type="number" min="115" max="128" step=".0001" value="${value.longitude !== undefined && value.longitude !== null && Number.isFinite(Number(value.longitude)) ? Number(value.longitude) : ""}" placeholder="e.g. 121.0244"></label></div>
+      <label>Location<input name="location" required maxlength="100" value="${escapeHtml(value.location)}" placeholder="Island, town, province"></label>
+      <div class="listing-image-field"><label>Property photo <span class="field-help">JPG, PNG, or WebP · up to 5 MB</span><input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp"${offering ? "" : " required"}></label><img id="listing-image-preview" src="${photoUrl(value.image, 420)}" alt="Property photo preview"></div>
+      <fieldset class="location-picker-fieldset"><legend>Pin the approximate location <span class="field-help">This location is shown publicly to guests</span></legend><div class="form-grid"><label>Latitude<input name="latitude" type="number" min="4" max="22" step=".00001" value="${value.latitude !== undefined && value.latitude !== null && Number.isFinite(Number(value.latitude)) ? Number(value.latitude) : ""}" placeholder="Choose on map"></label><label>Longitude<input name="longitude" type="number" min="115" max="128" step=".00001" value="${value.longitude !== undefined && value.longitude !== null && Number.isFinite(Number(value.longitude)) ? Number(value.longitude) : ""}" placeholder="Choose on map"></label></div><div id="property-location-map" role="application" aria-label="Choose your property's approximate location on the Philippines map"></div><p id="property-map-message" class="field-help" aria-live="polite">Tap the map to drop a pin. You can adjust it by tapping again.</p></fieldset>
       <div class="form-grid listing-stats"><label>Price per night (PHP)<input name="price" type="number" min="100" max="999999" step="100" required value="${Number(value.price)}"></label><label>Guests<input name="guests" type="number" min="1" max="20" required value="${Number(value.guests)}"></label><label>Min. nights<input name="minimumNights" type="number" min="1" max="30" required value="${Number(value.minimumNights || 1)}"></label></div>
       <div class="form-grid listing-stats"><label>Bedrooms<input name="bedrooms" type="number" min="0" max="30" required value="${Number(value.bedrooms || 1)}"></label><label>Bathrooms<input name="bathrooms" type="number" min="1" max="30" required value="${Number(value.bathrooms || 1)}"></label><label>Rating (out of 5)<input name="rating" type="number" min="1" max="5" step=".1" required value="${Number(value.rating || 4.6)}"></label></div>
       <label>Amenities <span class="field-help">Separate with commas</span><input name="amenities" maxlength="160" value="${escapeHtml((value.amenities || []).join(", "))}" placeholder="Sea view, kitchen, garden"></label>
       <fieldset class="days-fieldset"><legend>Available check-in days</legend><div class="day-checkboxes">${Booking.DAY_NAMES.map((day, index) => `<label><input type="checkbox" name="days" value="${index}"${value.days.includes(index) ? " checked" : ""}><span>${day.slice(0, 1)}</span><small>${day.slice(0, 3)}</small></label>`).join("")}</div></fieldset>
-      <p class="form-error hidden" id="form-error" role="alert"></p><div class="confirm-row"><span class="form-hint">Changes save on this device.</span><button class="button button-dark" type="submit">${offering ? "Save changes" : "List this place"} <span aria-hidden="true">→</span></button></div></form>`;
+      <p class="form-error hidden" id="form-error" role="alert"></p><div class="confirm-row"><span class="form-hint">Saved across devices.</span><button class="button button-dark" type="submit">${offering ? "Save changes" : "List this place"} <span aria-hidden="true">→</span></button></div></form>`;
     elements.modal.classList.remove("hidden");
     elements.modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     $("#offering-form").addEventListener("submit", submitOffering);
+    ["latitude", "longitude"].forEach((coordinate) => {
+      $(`[name="${coordinate}"]`).addEventListener("change", () => {
+        const latitude = Number($('[name="latitude"]').value);
+        const longitude = Number($('[name="longitude"]').value);
+        if (Number.isFinite(latitude) && latitude >= 4 && latitude <= 22 &&
+          Number.isFinite(longitude) && longitude >= 115 && longitude <= 128 && propertyPickerMap) {
+          setPropertyPickerLocation(latitude, longitude);
+        }
+      });
+    });
+    $('[name="imageFile"]').addEventListener("change", (event) => {
+      const file = event.currentTarget.files[0];
+      const error = $("#form-error");
+      if (!file) return;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+        event.currentTarget.value = "";
+        error.textContent = "Choose a JPG, PNG, or WebP image smaller than 5 MB.";
+        error.classList.remove("hidden");
+        return;
+      }
+      error.classList.add("hidden");
+      if (listingImagePreviewUrl) URL.revokeObjectURL(listingImagePreviewUrl);
+      listingImagePreviewUrl = URL.createObjectURL(file);
+      $("#listing-image-preview").src = listingImagePreviewUrl;
+    });
+    initializePropertyPickerMap(value);
     $("[data-close-modal]").focus();
   }
 
@@ -693,18 +787,30 @@
       error.classList.remove("hidden");
       return;
     }
+    const imageFile = data.get("imageFile");
+    if (imageFile && imageFile.size > 5 * 1024 * 1024) {
+      error.textContent = "Choose an image smaller than 5 MB.";
+      error.classList.remove("hidden");
+      return;
+    }
+    if (!editingOfferingId && (!imageFile || !imageFile.size)) {
+      error.textContent = "Attach a property photo before listing this place.";
+      error.classList.remove("hidden");
+      return;
+    }
     const latitude = data.get("latitude") === "" ? null : Number(data.get("latitude"));
     const longitude = data.get("longitude") === "" ? null : Number(data.get("longitude"));
-    if ((latitude === null) !== (longitude === null) ||
-      (latitude !== null && (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < 4 || latitude > 22 || longitude < 115 || longitude > 128))) {
-      error.textContent = "Enter both a valid Philippines map latitude and longitude, or leave both blank.";
+    if (latitude === null || longitude === null ||
+      !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      latitude < 4 || latitude > 22 || longitude < 115 || longitude > 128) {
+      error.textContent = "Tap the map to pin your place in the Philippines, or enter valid coordinates.";
       error.classList.remove("hidden");
       return;
     }
     const previous = state.offerings.find((item) => item.id === editingOfferingId);
     const updated = {
       id: editingOfferingId || `stay-${window.crypto.randomUUID()}`, ownerId: currentUser.id, name: data.get("name").trim(), category: data.get("category"),
-      description: data.get("description").trim(), location: data.get("location").trim(), image: data.get("image").trim(), latitude, longitude,
+      description: data.get("description").trim(), location: data.get("location").trim(), image: previous ? previous.image : "", latitude, longitude,
       price: Number(data.get("price")), guests: Number(data.get("guests")), bedrooms: Number(data.get("bedrooms")),
       bathrooms: Number(data.get("bathrooms")), minimumNights: Number(data.get("minimumNights")), rating: Number(data.get("rating")),
       reviews: previous ? previous.reviews : 0, icon: previous ? previous.icon : "⌂", badge: previous ? previous.badge : "A new favorite",
@@ -712,7 +818,17 @@
     };
     const submit = $('button[type="submit"]', event.currentTarget);
     submit.disabled = true;
+    let uploadedImage = null;
     try {
+      if (imageFile && imageFile.size) {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(imageFile.type)) {
+          throw new Error("Choose a JPG, PNG, or WebP image.");
+        }
+        uploadedImage = await GatherData.uploadListingImage(imageFile, currentUser.id, updated.id);
+        updated.image = uploadedImage.url;
+      } else if (previous) {
+        updated.image = previous.image;
+      }
       const saved = await GatherData.saveOffering(updated);
       closeModal();
       if (previous) state.offerings[state.offerings.indexOf(previous)] = saved;
@@ -724,6 +840,13 @@
       });
       showToast(previous ? "Place details updated." : "Your place is ready to find its people.");
     } catch (caught) {
+      if (uploadedImage) {
+        try {
+          await GatherData.deleteListingImage(uploadedImage.path);
+        } catch (cleanupError) {
+          console.error("Could not remove the unused uploaded listing photo.", cleanupError);
+        }
+      }
       error.textContent = caught.message;
       error.classList.remove("hidden");
       submit.disabled = false;
@@ -794,12 +917,20 @@
 
   searchForms.forEach((form) => {
     $('[data-search-field="checkin"]', form).addEventListener("change", () => updateSearchDates(form));
+    $('[data-search-field="guests"]', form).addEventListener("change", (event) => {
+      const customGuestCount = $('[data-search-field="custom-guests"]', form);
+      const isCustom = event.currentTarget.value === "custom";
+      customGuestCount.hidden = !isCustom;
+      customGuestCount.required = isCustom;
+      if (isCustom && !customGuestCount.value) customGuestCount.value = "9";
+    });
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       updateSearchDates(form);
       searchCheckin = $('[data-search-field="checkin"]', form).value;
       searchCheckout = $('[data-search-field="checkout"]', form).value;
-      searchGuests = Number($('[data-search-field="guests"]', form).value);
+      const selectedGuests = $('[data-search-field="guests"]', form).value;
+      searchGuests = Booking.getSearchGuestCount(selectedGuests, $('[data-search-field="custom-guests"]', form).value);
       searchTerm = $('[data-search-field="destination"]', form).value.trim();
       selectedCategory = "All stays";
       syncSearchForms();
