@@ -1,17 +1,10 @@
 (function () {
   "use strict";
   const Booking = window.GatherBooking;
-  const ACCOUNTS_KEY = "gather-local-accounts-v1";
-  const SESSION_KEY = "gather-local-session-v1";
-  const ACCOUNT_RESET_KEY = "gather-account-reset-v1";
-  if (localStorage.getItem(ACCOUNT_RESET_KEY) !== "done") {
-    localStorage.removeItem(ACCOUNTS_KEY);
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.setItem(ACCOUNT_RESET_KEY, "done");
-  }
-  const state = loadState();
-  const accounts = loadAccounts();
-  let currentUser = loadSession();
+  const GatherData = window.GatherSupabase;
+  const state = Booking.createInitialState();
+  state.unavailableDates = [];
+  let currentUser = null;
   const $ = (selector, scope) => (scope || document).querySelector(selector);
   const $$ = (selector, scope) => Array.from((scope || document).querySelectorAll(selector));
   const today = Booking.toDateString(new Date());
@@ -67,29 +60,13 @@
   }
   syncSearchForms();
 
-  function loadState() {
-    const stored = localStorage.getItem(Booking.STORAGE_KEY);
-    if (!stored) return Booking.createInitialState();
-    try {
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed.offerings) || !Array.isArray(parsed.bookings)) throw new Error("Saved stay data is incomplete.");
-      parsed.offerings = Booking.withDefaultOfferings(parsed.offerings);
-      if (!Array.isArray(parsed.favorites)) parsed.favorites = [];
-      return parsed;
-    } catch (error) {
-      console.error("Could not read saved stay data.", error);
-      window.setTimeout(() => showToast("Saved data could not be loaded. Your browser storage may be damaged."), 0);
-      return Booking.createInitialState();
-    }
-  }
-
-  function saveState() {
-    try { localStorage.setItem(Booking.STORAGE_KEY, JSON.stringify(state)); }
-    catch (error) {
-      console.error("Could not save stay data.", error);
-      showToast("Couldn’t save changes. Check that browser storage is available.");
-      throw error;
-    }
+  async function refreshSharedData() {
+    const shared = await GatherData.loadData(currentUser);
+    state.offerings.splice(0, state.offerings.length, ...shared.offerings);
+    state.bookings.splice(0, state.bookings.length, ...shared.bookings);
+    state.favorites.splice(0, state.favorites.length, ...shared.favorites);
+    state.unavailableDates.splice(0, state.unavailableDates.length, ...shared.unavailableDates);
+    renderAll();
   }
 
   function escapeHtml(value) {
@@ -168,86 +145,14 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function loadAccounts() {
-    const stored = localStorage.getItem(ACCOUNTS_KEY);
-    if (!stored) return [];
-    try {
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed)) throw new Error("Saved account data is not a list.");
-      return parsed;
-    } catch (error) {
-      console.error("Could not read local account data.", error);
-      window.setTimeout(() => showToast("Saved accounts could not be loaded. Browser storage may be damaged."), 0);
-      return [];
-    }
-  }
-
-  function loadSession() {
-    const accountId = localStorage.getItem(SESSION_KEY);
-    if (!accountId) return null;
-    const account = accounts.find((item) => item.id === accountId);
-    if (!account) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    return account;
-  }
-
-  function saveAccounts() {
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-  }
-
-  function encodeBytes(bytes) {
-    return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
-  }
-
-  async function hashPassword(password, salt) {
-    if (!window.crypto || !window.crypto.subtle) throw new Error("Secure password hashing is unavailable in this browser. Open Gather at http://localhost rather than as a file.");
-    const key = await window.crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-    const bits = await window.crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 120000 }, key, 256);
-    return encodeBytes(new Uint8Array(bits));
-  }
-
-  async function createLocalAccount(details) {
-    const email = details.email.trim().toLowerCase();
-    if (accounts.some((account) => account.email === email)) throw new Error("An account already uses this email. Sign in instead.");
-    if (details.password.length < 8) throw new Error("Use a password with at least 8 characters.");
-    const salt = window.crypto.getRandomValues(new Uint8Array(16));
-    const passwordHash = await hashPassword(details.password, salt);
-    const account = {
-      id: `account-${window.crypto.randomUUID()}`,
-      name: details.name.trim(),
-      email,
-      role: details.role,
-      salt: encodeBytes(salt),
-      passwordHash,
-      createdAt: new Date().toISOString()
-    };
-    accounts.push(account);
-    saveAccounts();
-    return account;
-  }
-
-  async function signInLocalAccount(details) {
-    const email = details.email.trim().toLowerCase();
-    const account = accounts.find((item) => item.email === email);
-    if (!account) throw new Error("No Gather account uses that email. Create an account to get started.");
-    const salt = Uint8Array.from(atob(account.salt), (character) => character.charCodeAt(0));
-    const passwordHash = await hashPassword(details.password, salt);
-    if (passwordHash !== account.passwordHash) throw new Error("That email and password don’t match.");
-    return account;
-  }
-
   function startSession(account) {
     currentUser = account;
-    localStorage.setItem(SESSION_KEY, account.id);
     renderAccountButton();
-    renderBookings();
-    renderManager();
+    return refreshSharedData();
   }
 
-  function endSession() {
-    localStorage.removeItem(SESSION_KEY);
+  async function endSession() {
+    await GatherData.signOut();
     currentUser = null;
     $("#account-dropdown").classList.add("hidden");
     $("#account-button").setAttribute("aria-expanded", "false");
@@ -290,7 +195,7 @@
         <button class="button button-dark auth-submit" type="submit">${isSignup ? "Create my account" : "Sign in"} <span aria-hidden="true">→</span></button>
       </form>
       <p class="auth-switch">${isSignup ? "Already have an account?" : "New to Gather?"} <button type="button" data-auth-mode="${isSignup ? "signin" : "signup"}" data-auth-role="${role}">${isSignup ? "Sign in" : "Create an account"}</button></p>
-      <p class="auth-local-note">Demo account, saved in this browser only. Don’t reuse a real password.</p>`;
+      <p class="auth-local-note">Gather accounts are securely managed and shared across your devices.</p>`;
     elements.modal.classList.remove("hidden");
     elements.modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
@@ -310,15 +215,27 @@
       if (authIntent && authIntent.type === "manage" && isSignup && formData.get("role") !== "host") {
         throw new Error("Choose “I want to list a place” to create a host account.");
       }
-      const account = isSignup
-        ? await createLocalAccount({ name: formData.get("name"), email: formData.get("email"), password: formData.get("password"), role: formData.get("role") })
-        : await signInLocalAccount({ email: formData.get("email"), password: formData.get("password") });
+      let account;
+      if (isSignup) {
+        const result = await GatherData.signUp({
+          name: formData.get("name"), email: formData.get("email"),
+          password: formData.get("password"), role: formData.get("role")
+        });
+        if (result.needsEmailConfirmation) {
+          closeModal();
+          showToast("Check your email to confirm your Gather account, then sign in.");
+          return;
+        }
+        account = result.profile;
+      } else {
+        account = await GatherData.signIn({ email: formData.get("email"), password: formData.get("password") });
+      }
       if (authIntent && authIntent.type === "manage" && account.role !== "host") {
         throw new Error("This part of Gather is for hosts. Create a host account or sign in with one.");
       }
       const intent = authIntent;
       authIntent = null;
-      startSession(account);
+      await startSession(account);
       closeModal();
       showToast(`Welcome${isSignup ? " to Gather" : " back"}, ${account.name.split(/\s+/)[0]}.`);
       if (intent && intent.type === "booking") openBookingModal(intent.offeringId);
@@ -342,7 +259,7 @@
       const matchesCategory = selectedCategory === "All stays" || offering.category === selectedCategory;
       return matchesQuery && matchesCategory && Number(offering.guests) >= searchGuests && Number(offering.price) <= maxPrice &&
         Number(offering.rating || 0) >= minRating &&
-        Booking.isAvailable(offering, searchCheckin, searchCheckout, state.bookings, searchGuests);
+        Booking.isAvailable(offering, searchCheckin, searchCheckout, state.bookings.concat(state.unavailableDates), searchGuests);
     });
     if (sortMode === "price") filtered.sort((a, b) => Number(a.price) - Number(b.price));
     if (sortMode === "rating") filtered.sort((a, b) => Number(b.rating) - Number(a.rating));
@@ -695,33 +612,42 @@
     $("[data-close-modal]").focus();
   }
 
-  function submitBooking(event) {
+  async function submitBooking(event) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const error = $("#form-error");
+    const button = $('button[type="submit"]', event.currentTarget);
+    button.disabled = true;
+    let booking;
     try {
-      const booking = Booking.createBooking(state, {
-        offeringId: activeOfferingId, checkin: $("#booking-checkin").value, checkout: $("#booking-checkout").value,
-        guests: formData.get("guests"), name: currentUser.name, email: currentUser.email, accountId: currentUser.id, notes: formData.get("notes")
+      booking = await GatherData.createBooking({
+        offeringId: activeOfferingId, checkin: $("#booking-checkin").value,
+        checkout: $("#booking-checkout").value, guests: formData.get("guests"),
+        notes: formData.get("notes")
       });
-      saveState();
-      closeModal();
-      renderBookings();
-      navigate("bookings");
-      if (!GatherEmailNotifications.isConfigured()) {
-        showToast("Booking saved. Admin email notifications still need setup.");
-      } else {
-        showToast(`Your ${booking.nights}-night stay at ${booking.offeringName} is confirmed.`);
-        GatherEmailNotifications.sendBookingNotification(booking).then(() => {
-          showToast("Booking confirmed, and the admin was notified by email.");
-        }).catch((notificationError) => {
-          console.error("Could not send the booking email notification.", notificationError);
-          showToast("Booking confirmed, but the admin email notification failed.");
-        });
-      }
     } catch (caught) {
       error.textContent = caught.message;
       error.classList.remove("hidden");
+      button.disabled = false;
+      return;
+    }
+    closeModal();
+    state.bookings.push(booking);
+    navigate("bookings");
+    refreshSharedData().catch((refreshError) => {
+      console.error("Booking was saved, but shared data could not be refreshed.", refreshError);
+      showToast(`Booking confirmed, but refresh failed: ${refreshError.message}`);
+    });
+    if (!GatherEmailNotifications.isConfigured()) {
+      showToast("Booking saved. Admin email notifications still need setup.");
+    } else {
+      showToast(`Your ${booking.nights}-night stay at ${booking.offeringName} is confirmed.`);
+      GatherEmailNotifications.sendBookingNotification(booking).then(() => {
+        showToast("Booking confirmed, and the admin was notified by email.");
+      }).catch((notificationError) => {
+        console.error("Could not send the booking email notification.", notificationError);
+        showToast("Booking confirmed, but the admin email notification failed.");
+      });
     }
   }
 
@@ -757,7 +683,7 @@
     $("[data-close-modal]").focus();
   }
 
-  function submitOffering(event) {
+  async function submitOffering(event) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const days = data.getAll("days").map(Number);
@@ -777,22 +703,34 @@
     }
     const previous = state.offerings.find((item) => item.id === editingOfferingId);
     const updated = {
-      id: editingOfferingId || `stay-${Date.now()}`, ownerId: previous ? previous.ownerId : currentUser.id, name: data.get("name").trim(), category: data.get("category"),
+      id: editingOfferingId || `stay-${window.crypto.randomUUID()}`, ownerId: currentUser.id, name: data.get("name").trim(), category: data.get("category"),
       description: data.get("description").trim(), location: data.get("location").trim(), image: data.get("image").trim(), latitude, longitude,
       price: Number(data.get("price")), guests: Number(data.get("guests")), bedrooms: Number(data.get("bedrooms")),
       bathrooms: Number(data.get("bathrooms")), minimumNights: Number(data.get("minimumNights")), rating: Number(data.get("rating")),
       reviews: previous ? previous.reviews : 0, icon: previous ? previous.icon : "⌂", badge: previous ? previous.badge : "A new favorite",
       amenities: data.get("amenities").split(",").map((item) => item.trim()).filter(Boolean), days
     };
-    if (previous) state.offerings[state.offerings.indexOf(previous)] = updated;
-    else state.offerings.unshift(updated);
-    saveState();
-    closeModal();
-    renderAll();
-    showToast(previous ? "Place details updated." : "Your place is ready to find its people.");
+    const submit = $('button[type="submit"]', event.currentTarget);
+    submit.disabled = true;
+    try {
+      const saved = await GatherData.saveOffering(updated);
+      closeModal();
+      if (previous) state.offerings[state.offerings.indexOf(previous)] = saved;
+      else state.offerings.unshift(saved);
+      renderAll();
+      refreshSharedData().catch((refreshError) => {
+        console.error("Listing was saved, but shared data could not be refreshed.", refreshError);
+        showToast(`Place saved, but refresh failed: ${refreshError.message}`);
+      });
+      showToast(previous ? "Place details updated." : "Your place is ready to find its people.");
+    } catch (caught) {
+      error.textContent = caught.message;
+      error.classList.remove("hidden");
+      submit.disabled = false;
+    }
   }
 
-  function removeOffering(id) {
+  async function removeOffering(id) {
     const offering = state.offerings.find((item) => item.id === id);
     if (!offering || !currentUser || offering.ownerId !== currentUser.id) return;
     const activeBookings = state.bookings.filter((booking) => booking.offeringId === id && booking.status !== "cancelled");
@@ -800,25 +738,41 @@
       ? `This place has ${activeBookings.length} active reservation${activeBookings.length === 1 ? "" : "s"}. Remove it and cancel those reservations?`
       : `Remove “${offering.name}” from your listings?`;
     if (!window.confirm(prompt)) return;
-    state.bookings.forEach((booking) => {
-      if (booking.offeringId === id && booking.status !== "cancelled") booking.status = "cancelled";
-    });
-    state.offerings = state.offerings.filter((item) => item.id !== id);
-    saveState();
-    renderAll();
-    showToast("Place removed.");
+    try {
+      await GatherData.deleteOffering(id);
+      state.offerings.splice(state.offerings.indexOf(offering), 1);
+      state.bookings.forEach((booking) => {
+        if (booking.offeringId === id && booking.status !== "cancelled") booking.status = "cancelled";
+      });
+      renderAll();
+      refreshSharedData().catch((refreshError) => {
+        console.error("Place was removed, but shared data could not be refreshed.", refreshError);
+        showToast(`Place removed, but refresh failed: ${refreshError.message}`);
+      });
+      showToast("Place removed.");
+    } catch (error) {
+      console.error("Could not remove the Gather listing.", error);
+      showToast(`Could not remove place: ${error.message}`);
+    }
   }
 
-  function cancelBooking(id) {
+  async function cancelBooking(id) {
     const booking = state.bookings.find((item) => item.id === id);
     if (!booking || !currentUser || booking.accountId !== currentUser.id || booking.status === "cancelled") return;
     if (!window.confirm(`Cancel your ${booking.nights}-night stay at ${booking.offeringName}?`)) return;
-    booking.status = "cancelled";
-    saveState();
-    renderBookings();
-    renderOfferings();
-    $("#booking-count").textContent = String(state.bookings.filter((item) => item.accountId === currentUser.id && item.status !== "cancelled").length);
-    showToast("Reservation cancelled. Those dates are available again.");
+    try {
+      await GatherData.cancelBooking(id);
+      booking.status = "cancelled";
+      renderAll();
+      refreshSharedData().catch((refreshError) => {
+        console.error("Reservation was cancelled, but shared data could not be refreshed.", refreshError);
+        showToast(`Reservation cancelled, but refresh failed: ${refreshError.message}`);
+      });
+      showToast("Reservation cancelled. Those dates are available again.");
+    } catch (error) {
+      console.error("Could not cancel the Gather reservation.", error);
+      showToast(`Could not cancel reservation: ${error.message}`);
+    }
   }
 
   function renderAll() {
@@ -913,7 +867,7 @@
     syncSearchForms();
     navigate("search");
   }));
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     if (event.target.closest("#account-button")) {
       if (!currentUser) {
         openAuthModal("signin", "guest", null);
@@ -927,7 +881,13 @@
     const accountAction = event.target.closest("[data-account-action]");
     if (accountAction) {
       const action = accountAction.dataset.accountAction;
-      if (action === "signout") endSession();
+      if (action === "signout") {
+        try { await endSession(); }
+        catch (error) {
+          console.error("Could not sign out of Gather.", error);
+          showToast(`Could not sign out: ${error.message}`);
+        }
+      }
       else navigate(action);
       return;
     }
@@ -953,16 +913,26 @@
     if (offering) return openBookingModal(offering.dataset.openOffering);
     const favorite = event.target.closest("[data-favorite]");
     if (favorite) {
+      if (!currentUser) {
+        openAuthModal("signin", "guest", null);
+        showToast("Sign in to save stays to your shared favorites.");
+        return;
+      }
       const active = !state.favorites.includes(favorite.dataset.favorite);
-      state.favorites = active
-        ? [...state.favorites, favorite.dataset.favorite]
-        : state.favorites.filter((id) => id !== favorite.dataset.favorite);
-      saveState();
-      favorite.classList.toggle("saved", active);
-      favorite.textContent = active ? "♥" : "♡";
-      favorite.setAttribute("aria-pressed", String(active));
-      favorite.setAttribute("aria-label", `${active ? "Remove" : "Save"} ${state.offerings.find((item) => item.id === favorite.dataset.favorite).name} ${active ? "from" : "to"} favorites`);
-      showToast(active ? "Saved to your Gather favorites." : "Removed from your favorites.");
+      const offeringId = favorite.dataset.favorite;
+      try {
+        await GatherData.setFavorite(currentUser.id, offeringId, active);
+        if (active) state.favorites.push(offeringId);
+        else state.favorites.splice(state.favorites.indexOf(offeringId), 1);
+        favorite.classList.toggle("saved", active);
+        favorite.textContent = active ? "♥" : "♡";
+        favorite.setAttribute("aria-pressed", String(active));
+        favorite.setAttribute("aria-label", `${active ? "Remove" : "Save"} ${state.offerings.find((item) => item.id === offeringId).name} ${active ? "from" : "to"} favorites`);
+        showToast(active ? "Saved to your Gather favorites." : "Removed from your favorites.");
+      } catch (error) {
+        console.error("Could not update Gather favorites.", error);
+        showToast(`Could not update favorite: ${error.message}`);
+      }
       return;
     }
     const cancel = event.target.closest("[data-cancel-booking]");
@@ -992,41 +962,34 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.modal.classList.contains("hidden")) closeModal();
   });
-  window.addEventListener("storage", (event) => {
-    if (event.key === ACCOUNTS_KEY) {
-      const accountId = localStorage.getItem(SESSION_KEY);
-      accounts.splice(0, accounts.length, ...loadAccounts());
-      currentUser = accounts.find((account) => account.id === accountId) || null;
-      renderAccountButton();
-      renderBookings();
-      renderManager();
-      return;
-    }
-    if (event.key === SESSION_KEY) {
-      currentUser = accounts.find((account) => account.id === event.newValue) || null;
-      renderAccountButton();
-      renderBookings();
-      renderManager();
-      return;
-    }
-    if (event.key !== Booking.STORAGE_KEY || !event.newValue) return;
-    try {
-      const incoming = JSON.parse(event.newValue);
-      if (Array.isArray(incoming.offerings) && Array.isArray(incoming.bookings)) {
-        state.offerings.splice(0, state.offerings.length, ...incoming.offerings);
-        state.bookings.splice(0, state.bookings.length, ...incoming.bookings);
-        renderAll();
-      }
-    } catch (error) {
-      console.error("Could not sync saved stay data from another tab.", error);
-    }
+  GatherData.onAuthStateChange((account) => {
+    currentUser = account;
+    renderAccountButton();
+    refreshSharedData().catch((error) => {
+      console.error("Could not refresh shared Gather data after an account change.", error);
+      showToast(`Could not load shared Gather data: ${error.message}`);
+    });
   });
-  renderAccountButton();
-  renderAll();
-  const initialRoute = window.location.hash.slice(1) === "browse" ? "home" : window.location.hash.slice(1);
-  if (["home", "search", "bookings", "manage"].includes(initialRoute) && initialRoute !== "home") {
-    navigate(initialRoute, false);
-  } else {
-    navigate("home", false);
+  async function initialize() {
+    try {
+      currentUser = await GatherData.getCurrentProfile();
+      await refreshSharedData();
+    } catch (error) {
+      console.error("Could not connect to the shared Gather database.", error);
+      showToast(`Could not load Gather: ${error.message}`);
+      state.offerings.length = 0;
+      state.bookings.length = 0;
+      state.favorites.length = 0;
+      state.unavailableDates.length = 0;
+      renderAccountButton();
+      renderAll();
+    }
+    const initialRoute = window.location.hash.slice(1) === "browse" ? "home" : window.location.hash.slice(1);
+    if (["home", "search", "bookings", "manage"].includes(initialRoute) && initialRoute !== "home") {
+      navigate(initialRoute, false);
+    } else {
+      navigate("home", false);
+    }
   }
+  initialize();
 })();

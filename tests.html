@@ -13,11 +13,14 @@
   </head>
   <body>
     <h1>Stay booking checks</h1>
-    <p>Focused browser-native tests for booking rules, EmailJS notifications, and the Philippines map asset.</p>
+    <p>Focused browser-native tests for booking rules, shared Supabase listings, EmailJS notifications, and the Philippines map asset.</p>
     <ol id="results"></ol>
     <p id="summary" role="status"></p>
     <script src="booking.js"></script>
     <script src="email-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-data.js"></script>
     <script>
       (function () {
         const api = window.GatherBooking;
@@ -126,6 +129,13 @@
           throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin: "2030-01-05", checkout, guests: 2, name: "Alex Doe", email: "alex@example.com" }, now), "future");
         });
         async function finish() {
+          await testAsync("loads shared Philippine stays and public availability from Supabase", async function () {
+            const shared = await window.GatherSupabase.loadData(null);
+            assert(shared.offerings.length === 8, "Supabase should return all eight starter stays");
+            assert(shared.offerings.some((offering) => offering.id === "isla-norte"), "Supabase should include the Siargao sample stay");
+            assert(shared.bookings.length === 0 && shared.favorites.length === 0, "Signed-out loading must not expose private bookings or favorites");
+            assert(Array.isArray(shared.unavailableDates), "Public availability should be returned separately from private booking details");
+          });
           await testAsync("sends booking details to EmailJS with configured credentials", async function () {
             const previousConfig = window.GATHER_EMAIL_CONFIG;
             const previousFetch = window.fetch;

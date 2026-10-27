@@ -35,7 +35,7 @@ create table if not exists public.offerings (
 
 create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),
-  offering_id text not null references public.offerings (id) on delete restrict,
+  offering_id text references public.offerings (id) on delete set null,
   guest_id uuid not null references public.profiles (id) on delete restrict,
   host_id uuid references public.profiles (id) on delete set null,
   offering_name text not null,
@@ -57,6 +57,12 @@ create table if not exists public.bookings (
   check (nights = checkout - checkin),
   check (total = price * nights)
 );
+
+alter table public.bookings alter column offering_id drop not null;
+alter table public.bookings drop constraint if exists bookings_offering_id_fkey;
+alter table public.bookings
+  add constraint bookings_offering_id_fkey
+  foreign key (offering_id) references public.offerings (id) on delete set null;
 
 create table if not exists public.favorites (
   user_id uuid not null references public.profiles (id) on delete cascade,
@@ -133,10 +139,7 @@ create policy "Guests and hosts can read related bookings"
   on public.bookings for select to authenticated
   using (
     guest_id = (select auth.uid())
-    or exists (
-      select 1 from public.offerings o
-      where o.id = offering_id and o.owner_id = (select auth.uid())
-    )
+    or host_id = (select auth.uid())
   );
 
 drop policy if exists "Users can read their own favorites" on public.favorites;
