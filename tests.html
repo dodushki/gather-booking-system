@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gather stay booking tests</title>
+    <style>
+      body { max-width: 760px; margin: 50px auto; padding: 0 20px; color: #1d3129; background: #f5f7f5; font: 14px/1.5 "Segoe UI", sans-serif; }
+      h1 { font: 500 34px Georgia, serif; } #results { padding: 0; list-style: none; }
+      li { margin: 8px 0; padding: 12px 14px; background: #fff; border-left: 4px solid #245c47; }
+      li.fail { border-color: #a34738; color: #a34738; } #summary { margin-top: 22px; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>Stay booking checks</h1>
+    <p>Focused browser-native tests for booking rules, EmailJS notifications, and the Philippines map asset.</p>
+    <ol id="results"></ol>
+    <p id="summary" role="status"></p>
+    <script src="booking.js"></script>
+    <script src="email-config.js"></script>
+    <script>
+      (function () {
+        const api = window.GatherBooking;
+        const output = document.getElementById("results");
+        let passed = 0;
+        let failed = 0;
+        function test(name, fn) {
+          const item = document.createElement("li");
+          try {
+            fn();
+            passed += 1;
+            item.textContent = `PASS — ${name}`;
+          } catch (error) {
+            failed += 1;
+            item.className = "fail";
+            item.textContent = `FAIL — ${name}: ${error.message}`;
+          }
+          output.appendChild(item);
+        }
+        async function testAsync(name, fn) {
+          const item = document.createElement("li");
+          try {
+            await fn();
+            passed += 1;
+            item.textContent = `PASS — ${name}`;
+          } catch (error) {
+            failed += 1;
+            item.className = "fail";
+            item.textContent = `FAIL — ${name}: ${error.message}`;
+          }
+          output.appendChild(item);
+        }
+        function assert(condition, message) {
+          if (!condition) throw new Error(message || "Assertion failed");
+        }
+        function throws(fn, phrase) {
+          let thrown = false;
+          try { fn(); } catch (error) { thrown = error.message.includes(phrase); }
+          assert(thrown, `Expected error containing "${phrase}"`);
+        }
+        const state = api.createInitialState();
+        const casa = state.offerings.find((item) => item.id === "isla-norte");
+        const now = new Date(2030, 0, 6, 12, 0);
+        const checkin = "2030-01-07";
+        const checkout = "2030-01-10";
+
+        test("calculates local-calendar nights across month boundaries", function () {
+          assert(api.getNights("2030-01-30", "2030-02-02") === 3, "Should count three nights");
+          assert(api.getNights("2030-02-02", "2030-01-30") === 0, "Checkout cannot precede check-in");
+        });
+        test("starts with sample stays across Philippine destinations and PHP prices", function () {
+          assert(state.offerings.length === 8, "Should include eight sample stays");
+          assert(state.offerings.every((offering) => offering.rating >= 1 && offering.rating <= 5), "Sample stay ratings should use a five-point scale");
+          assert(state.offerings.every((offering) => /Philippines|Siargao|Baguio|Bohol|Palawan|Coron/.test(offering.location)), "Sample stays should be in the Philippines");
+          assert(state.offerings.every((offering) => offering.price >= 1000), "Nightly prices should use realistic PHP amounts");
+          assert(["City hotels", "Serviced apartments", "Heritage inns", "Farm stays"].every((category) => state.offerings.some((offering) => offering.category === category)), "Sample stays should include hotels and different kinds of places");
+          assert(state.offerings.every((offering) =>
+            Number.isFinite(offering.latitude) && offering.latitude >= 4 && offering.latitude <= 22 &&
+            Number.isFinite(offering.longitude) && offering.longitude >= 115 && offering.longitude <= 128
+          ), "Every sample stay should have map coordinates in the Philippines");
+        });
+        test("adds new sample stays to saved inventory without replacing host listings", function () {
+          const saved = state.offerings.slice(0, 4).map((offering) => ({ ...offering, price: offering.price + 100 }));
+          saved.push({ id: "host-place", name: "Host place", category: "Guest houses", location: "Cebu City, Philippines", price: 3000, days: [0, 1, 2, 3, 4, 5, 6], amenities: [] });
+          const merged = api.withDefaultOfferings(saved);
+          assert(merged.length === 9, "Should add four defaults while preserving the saved host listing");
+          assert(merged.find((offering) => offering.id === "isla-norte").price === saved[0].price, "Should preserve saved edits to existing stays");
+          assert(Number.isFinite(merged.find((offering) => offering.id === "isla-norte").latitude), "Should add map coordinates to existing saved stays");
+          assert(merged.some((offering) => offering.id === "host-place"), "Should preserve host-created listings");
+        });
+        test("converts saved ten-point ratings to the five-point scale", function () {
+          const migrated = api.withDefaultOfferings([{ id: "host-place", name: "Host place", rating: 9.2, days: [], amenities: [] }]);
+          assert(migrated.find((offering) => offering.id === "host-place").rating === 4.6, "Legacy host rating should be halved");
+        });
+        test("allows an available stay with the right capacity and minimum nights", function () {
+          assert(api.isAvailable(casa, checkin, checkout, [], 2, now), "Three-night stay should be bookable");
+          assert(!api.isAvailable(casa, checkin, "2030-01-08", [], 2, now), "Casa Mare requires two nights minimum");
+          assert(!api.isAvailable(casa, checkin, checkout, [], 5, now), "This stay accommodates up to four guests");
+        });
+        test("rejects stays in the past and unavailable check-in days", function () {
+          const weekdayOnly = { ...casa, days: [1] };
+          assert(!api.isAvailable(casa, "2030-01-05", "2030-01-07", [], 1, now), "Past check-ins should be unavailable");
+          assert(!api.isAvailable(weekdayOnly, "2030-01-08", "2030-01-10", [], 1, now), "Tuesday check-in should be unavailable");
+        });
+        test("blocks overlapping nights but leaves back-to-back checkout available", function () {
+          const reserved = [{ offeringId: casa.id, checkin: "2030-01-07", checkout: "2030-01-10", status: "confirmed" }];
+          assert(!api.isAvailable(casa, "2030-01-09", "2030-01-12", reserved, 1, now), "Overlapping nights should be blocked");
+          assert(api.isAvailable(casa, "2030-01-10", "2030-01-12", reserved, 1, now), "A same-day checkout/check-in is valid");
+          assert(api.isAvailable(casa, "2030-01-09", "2030-01-12", [{ ...reserved[0], status: "cancelled" }], 1, now), "Cancelled trips should release the dates");
+        });
+        test("creates a reservation with the correct nightly total and guest count", function () {
+          const bookingState = api.createInitialState();
+          bookingState.offerings.find((offering) => offering.id === casa.id).ownerId = "host-123";
+          const booking = api.createBooking(bookingState, { offeringId: casa.id, checkin, checkout, guests: 2, name: "Jamie Lee", email: "jamie@example.com", accountId: "guest-123", notes: "First visit" }, now);
+          assert(booking.nights === 3 && booking.total === casa.price * 3, "Total should be nightly price times nights");
+          assert(booking.guests === 2 && booking.status === "confirmed" && booking.notes === "First visit", "Guest count and confirmation should be recorded");
+          assert(booking.accountId === "guest-123", "The trip should belong to the signed-in guest");
+          assert(booking.hostId === "host-123", "The reservation should be linked to the listing host");
+          assert(bookingState.bookings.length === 1, "The confirmed trip should be saved in the booking state");
+        });
+        test("rejects conflicts, invalid contact details, and invalid stay dates", function () {
+          const bookingState = api.createInitialState();
+          api.createBooking(bookingState, { offeringId: casa.id, checkin, checkout, guests: 2, name: "Jamie Lee", email: "jamie@example.com" }, now);
+          throws(() => api.createBooking(bookingState, { offeringId: casa.id, checkin: "2030-01-09", checkout: "2030-01-12", guests: 1, name: "Alex Doe", email: "alex@example.com" }, now), "not available");
+          throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin, checkout, guests: 2, name: "Alex Doe", email: "not-an-email" }, now), "valid email");
+          throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin: "2030-01-05", checkout, guests: 2, name: "Alex Doe", email: "alex@example.com" }, now), "future");
+        });
+        async function finish() {
+          await testAsync("sends booking details to EmailJS with configured credentials", async function () {
+            const previousConfig = window.GATHER_EMAIL_CONFIG;
+            const previousFetch = window.fetch;
+            let requestUrl = "";
+            let requestBody = null;
+            window.GATHER_EMAIL_CONFIG = { serviceId: "service-test", templateId: "template-test", publicKey: "public-test" };
+            window.fetch = async function (url, options) {
+              requestUrl = url;
+              requestBody = JSON.parse(options.body);
+              return { ok: true };
+            };
+            try {
+              const sent = await window.GatherEmailNotifications.sendBookingNotification({
+                id: "trip-test", name: "Jamie Lee", email: "jamie@example.com",
+                offeringName: "Isla Norte", location: "Siargao, Philippines",
+                checkin: "2030-01-07", checkout: "2030-01-10", nights: 3,
+                guests: 2, price: 6800, total: 20400, notes: "First visit"
+              });
+              assert(sent, "Notification should report success");
+              assert(requestUrl === "https://api.emailjs.com/api/v1.0/email/send", "Should use the EmailJS send endpoint");
+              assert(requestBody.service_id === "service-test" && requestBody.template_id === "template-test" && requestBody.user_id === "public-test", "Should send configured EmailJS identifiers");
+              assert(requestBody.template_params.booking_id === "trip-test" && requestBody.template_params.guest_email === "jamie@example.com", "Should include booking and guest contact details");
+              assert(requestBody.template_params.total.includes("20,400"), "Should format the total in Philippine pesos");
+            } finally {
+              window.GATHER_EMAIL_CONFIG = previousConfig;
+              window.fetch = previousFetch;
+            }
+          });
+          await testAsync("skips notifications until EmailJS is configured", async function () {
+            const previousConfig = window.GATHER_EMAIL_CONFIG;
+            const previousFetch = window.fetch;
+            let requested = false;
+            window.GATHER_EMAIL_CONFIG = {};
+            window.fetch = async function () {
+              requested = true;
+              return { ok: true };
+            };
+            try {
+              const sent = await window.GatherEmailNotifications.sendBookingNotification({});
+              assert(sent === false && !requested, "An incomplete setup should not send a request");
+            } finally {
+              window.GATHER_EMAIL_CONFIG = previousConfig;
+              window.fetch = previousFetch;
+            }
+          });
+          await testAsync("reports EmailJS delivery errors without hiding them", async function () {
+            const previousConfig = window.GATHER_EMAIL_CONFIG;
+            const previousFetch = window.fetch;
+            window.GATHER_EMAIL_CONFIG = { serviceId: "service-test", templateId: "template-test", publicKey: "public-test" };
+            window.fetch = async function () {
+              return { ok: false, status: 429, text: async function () { return "Rate limit exceeded"; } };
+            };
+            try {
+              let caught = "";
+              try {
+                await window.GatherEmailNotifications.sendBookingNotification({
+                  checkin: "2030-01-07", checkout: "2030-01-10"
+                });
+              } catch (error) {
+                caught = error.message;
+              }
+              assert(caught.includes("429") && caught.includes("Rate limit exceeded"), "Failed responses should expose the EmailJS error");
+            } finally {
+              window.GATHER_EMAIL_CONFIG = previousConfig;
+              window.fetch = previousFetch;
+            }
+          });
+          await testAsync("loads a valid Philippines border outline", async function () {
+            const response = await fetch("./philippines-border.geojson");
+            assert(response.ok, "Boundary asset should be served successfully");
+            const data = await response.json();
+            const geometry = data.features[0].geometry;
+            assert(geometry.type === "MultiPolygon" && geometry.coordinates.length > 80, "The country boundary should include the Philippines' major islands");
+            let vertices = 0;
+            geometry.coordinates.forEach((polygon) => polygon.forEach((ring) => {
+              assert(ring.length >= 4, "Every boundary ring needs at least four coordinates");
+              const first = ring[0];
+              const last = ring[ring.length - 1];
+              assert(first[0] === last[0] && first[1] === last[1], "Every boundary ring should be closed");
+              ring.forEach((point) => {
+                assert(Number.isFinite(point[0]) && Number.isFinite(point[1]), "Boundary coordinates should be numeric");
+                assert(point[0] >= 115 && point[0] <= 128 && point[1] >= 4 && point[1] <= 22, "Boundary coordinates should be within the Philippines map bounds");
+                vertices += 1;
+              });
+            }));
+            assert(vertices > 500, "The country outline should have enough points to be recognizable");
+          });
+          document.getElementById("summary").textContent = `${passed} passed · ${failed} failed`;
+          document.title = `${failed ? "FAIL" : "PASS"} — Gather stay booking tests`;
+        }
+        finish();
+      })();
+    </script>
+  </body>
+</html>

@@ -517,3 +517,46 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+body { font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; font-size: 16px; line-height: 1.5; -webkit-font-smoothing: auto; }
+.hero h1, .page-intro h1, .home-hero h1, .search-page-heading h1,
+.destination-card strong, .how-it-works > h2, .steps-grid h3,
+.section-heading h2, .map-heading h3, .offering-title-row h3,
+.empty-state h3, .booking-detail h3, .panel-heading h2, .managed-info h3,
+.host-booking h3, .modal-property h2, .modal-heading h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.2;
+}
+.hero h1, .home-hero h1 { letter-spacing: -.035em; }
+.hero-text, .home-hero .hero-text, .steps-grid p, .search-page-heading > div > p:last-child,
+.offering-summary, .modal-description, .manage-note p, .booking-email-disclosure {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.eyebrow, .hero-photo-caption, .hero-photo-note strong, .field-label,
+.destination-card > span, .destination-card small, .map-attribution,
+.card-badge, .amenity-row span, .booking-category, .booking-detail .booking-contact,
+.cancelled-label, .soft-badge, .managed-info p, .note-foot, .modal-kicker,
+.modal-amenities span, .picker-heading > span, .field-help, .form-hint,
+.signed-in-details > div span, .signed-in-details > small {
+  font-size: 12px;
+}
+.nav-count, .text-link, .sort-control label, .sort-control select, .sort-option,
+.category-pill, .result-summary, .range-filter, .rating-filter,
+.rating-filter select, .comparison-note, #map-status, .map-control-button,
+.offering-location, .property-facts, .review-copy strong, .review-copy small,
+.price small, .stay-card-dates, .booking-detail p, .panel-heading .eyebrow,
+.host-booking p, .host-empty, .page-footer, .modal-location, .picker-heading strong,
+.date-pair label, .guest-input, .booking-form label, .offering-form > label,
+.confirm-row > div, .confirm-row > div small, .form-error, .form-modal-heading > p,
+.days-fieldset legend {
+  font-size: 13px;
+}
+.search-field input, .search-field select, .search-field input[type="date"],
+.date-pair input, .guest-input select, .booking-form input, .booking-form textarea,
+.offering-form input, .offering-form textarea, .offering-form select {
+  font-size: 16px;
+}
+.button, .search-submit, .profile-button { font-size: 14px; }
+.rating-chip, .booking-actions .button, .nav-link { font-size: 13px; }
+.booking-email-disclosure { margin: 12px 0 0; color: var(--muted); }

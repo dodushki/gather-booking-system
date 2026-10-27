@@ -666,6 +666,7 @@
         <div class="picker-heading details-heading"><div><span class="step-number">02</span><strong>Your details</strong></div><span>Almost there</span></div>
         <div class="signed-in-details"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><span>${escapeHtml(currentUser.email)}</span></div><small>Booking as a Gather guest</small></div>
         <label class="notes-label">A note for your host <span>Optional</span><textarea name="notes" rows="2" maxlength="400" placeholder="Anything you’d like them to know?"></textarea></label>
+        <p class="booking-email-disclosure">Your booking contact details will be shared with Gather’s admin for email notification.</p>
         <div class="confirm-row"><div><strong id="booking-total">${money(offering.price * Booking.getNights(checkin, checkout))}</strong><span> · ${money(offering.price)} per night</span><small id="booking-nights">${Booking.getNights(checkin, checkout)} nights</small></div><button class="button button-dark" type="submit">Reserve your stay <span aria-hidden="true">→</span></button></div><p class="form-error hidden" id="form-error" role="alert"></p>
       </form>`;
     elements.modal.classList.remove("hidden");
@@ -700,8 +701,18 @@
       saveState();
       closeModal();
       renderBookings();
-      showToast(`Your ${booking.nights}-night stay at ${booking.offeringName} is confirmed.`);
       navigate("bookings");
+      if (!GatherEmailNotifications.isConfigured()) {
+        showToast("Booking saved. Admin email notifications still need setup.");
+      } else {
+        showToast(`Your ${booking.nights}-night stay at ${booking.offeringName} is confirmed.`);
+        GatherEmailNotifications.sendBookingNotification(booking).then(() => {
+          showToast("Booking confirmed, and the admin was notified by email.");
+        }).catch((notificationError) => {
+          console.error("Could not send the booking email notification.", notificationError);
+          showToast("Booking confirmed, but the admin email notification failed.");
+        });
+      }
     } catch (caught) {
       error.textContent = caught.message;
       error.classList.remove("hidden");
