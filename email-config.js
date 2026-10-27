@@ -1,7 +1,7 @@
 window.GATHER_EMAIL_CONFIG = Object.freeze({
-  serviceId: "",
-  templateId: "",
-  publicKey: ""
+  serviceId: "service_xqt6eza",
+  templateId: "template_7erkc2r",
+  publicKey: "ojBi2w2qp2sK8uG5s"
 });
 
 (function () {
