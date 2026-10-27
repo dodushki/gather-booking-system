@@ -437,28 +437,20 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
   .search-page-panel .search-grid { grid-template-columns: 1fr 1fr; }
   .search-page-panel .destination-field { grid-column: span 2; }
   .search-page-panel .search-submit { grid-column: span 2; }
-  .search-discovery { display: flex; flex-direction: column; }
-  .search-results-heading, .stay-results-layout:not(.map-expanded), .stay-results-column { display: contents; }
   .search-results-heading { gap: 8px; }
   .search-results-heading h2 { font-size: 24px; }
-  .search-results-heading .sort-control { align-self: flex-start; }
-  .search-results-heading > div:first-child { order: 0; }
-  .search-discovery .stay-map-section { order: 1; }
-  .search-results-heading .sort-control { order: 2; }
-  #category-filters { order: 3; }
-  .search-discovery .comparison-filters { order: 4; }
-  .search-discovery .result-summary { order: 5; }
-  #offering-grid { order: 6; }
-  #empty-offerings { order: 7; }
+  .search-results-heading { margin-bottom: 14px; }
+  .stay-results-column > .sort-control { align-items: flex-start; margin: 0 0 12px; }
+  .search-results-column .sort-options { justify-content: flex-start; }
   .comparison-filters { align-items: stretch; gap: 12px; }
   .range-filter { flex-basis: 100%; }
   .rating-filter { justify-content: space-between; }
   .comparison-note { flex-basis: 100%; }
-  .stay-results-layout { height: auto; min-height: 0; gap: 14px; }
+  .stay-results-layout { height: auto; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
   .stay-results-layout.map-expanded { position: fixed; inset: 2vh 2vw; height: auto; min-height: 0; display: block; padding: 8px; }
   .search-view .stay-results-layout, .search-view .stay-results-layout.map-expanded { height: auto; min-height: 0; }
   .stay-results-column { overflow: visible; }
-  .stay-map-section { position: static; height: auto; }
+  .stay-map-section { position: static; height: auto; order: -1; }
   .map-expanded .stay-map-section { position: relative; height: 100%; }
   .map-expanded .map-heading { align-items: flex-start; flex-direction: column; gap: 8px; padding: 10px 12px; }
   .map-expanded .map-heading-actions { width: 100%; justify-content: space-between; }
