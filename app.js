@@ -34,6 +34,8 @@
   let activeOfferingId = null;
   let editingOfferingId = null;
   let authIntent = null;
+  let pendingConfirmation = null;
+  let confirmationPreviousFocus = null;
   let toastTimer;
   let stayMap = null;
   let propertyPickerMap = null;
@@ -74,6 +76,7 @@
     state.bookings.splice(0, state.bookings.length, ...shared.bookings);
     state.favorites.splice(0, state.favorites.length, ...shared.favorites);
     state.unavailableDates.splice(0, state.unavailableDates.length, ...shared.unavailableDates);
+    renderAccountButton();
     renderAll();
   }
 
@@ -108,9 +111,40 @@
     toastTimer = window.setTimeout(() => elements.toast.classList.remove("visible"), 3000);
   }
 
+  function requestConfirmation({ title, message, confirmLabel, danger }) {
+    if (pendingConfirmation) closeConfirmation(false);
+    const backdrop = $("#confirmation-modal");
+    $("#confirmation-title").textContent = title;
+    $("#confirmation-message").textContent = message;
+    const confirmButton = $("[data-confirm-accept]");
+    confirmButton.textContent = confirmLabel || "Confirm";
+    confirmButton.classList.toggle("button-danger", Boolean(danger));
+    confirmationPreviousFocus = document.activeElement;
+    backdrop.classList.remove("hidden");
+    backdrop.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    return new Promise((resolve) => {
+      pendingConfirmation = resolve;
+      $("[data-confirm-cancel]").focus();
+    });
+  }
+
+  function closeConfirmation(confirmed) {
+    if (!pendingConfirmation) return;
+    const resolve = pendingConfirmation;
+    pendingConfirmation = null;
+    const backdrop = $("#confirmation-modal");
+    backdrop.classList.add("hidden");
+    backdrop.setAttribute("aria-hidden", "true");
+    if (elements.modal.classList.contains("hidden")) document.body.classList.remove("modal-open");
+    if (confirmationPreviousFocus && confirmationPreviousFocus.isConnected) confirmationPreviousFocus.focus();
+    confirmationPreviousFocus = null;
+    resolve(confirmed);
+  }
+
   function navigate(tab, updateLocation) {
     if (tab === "bookings" && !currentUser) {
-      openAuthModal("signup", "guest", { type: "bookings" });
+      openAuthModal("signin", "guest", { type: "bookings" });
       return;
     }
     if (tab === "manage" && (!currentUser || currentUser.role !== "host")) {
@@ -218,13 +252,22 @@
     const isSignup = formData.has("name");
     const error = $("#form-error");
     const button = $(".auth-submit");
-    button.disabled = true;
-    button.textContent = isSignup ? "Creating account…" : "Signing in…";
     try {
       if (authIntent && authIntent.type === "manage" && isSignup && formData.get("role") !== "host") {
         throw new Error("Choose “I want to list a place” to create a host account.");
       }
       let account;
+      if (isSignup) {
+        const role = formData.get("role");
+        const confirmed = await requestConfirmation({
+          title: `Create your ${role === "host" ? "host" : "guest"} account?`,
+          message: `Gather will create an account for ${String(formData.get("email")).trim()}. ${role === "host" ? "Your host profile will let you publish property listings." : "Your guest profile will let you save and book stays."} You may need to confirm your email before signing in.`,
+          confirmLabel: "Create account"
+        });
+        if (!confirmed) return;
+      }
+      button.disabled = true;
+      button.textContent = isSignup ? "Creating account…" : "Signing in…";
       if (isSignup) {
         const result = await GatherData.signUp({
           name: formData.get("name"), email: formData.get("email"),
@@ -265,7 +308,8 @@
     const filtered = state.offerings.filter((offering) => {
       const matchesQuery = !query || query === "philippines" || query === "pilipinas" ||
         `${offering.name} ${offering.category} ${offering.description} ${offering.location} ${(offering.amenities || []).join(" ")}`.toLowerCase().includes(query);
-      const matchesCategory = selectedCategory === "All stays" || offering.category === selectedCategory;
+      const matchesCategory = selectedCategory === "All stays" ||
+        (selectedCategory === "Favorites" ? state.favorites.includes(offering.id) : offering.category === selectedCategory);
       return matchesQuery && matchesCategory && Number(offering.guests) >= searchGuests && Number(offering.price) <= maxPrice &&
         Number(offering.rating || 0) >= minRating &&
         Booking.isAvailable(offering, searchCheckin, searchCheckout, state.bookings.concat(state.unavailableDates), searchGuests);
@@ -278,6 +322,7 @@
 
   function renderCategories() {
     const categories = ["All stays", ...new Set(state.offerings.map((item) => item.category))];
+    if (currentUser) categories.push("Favorites");
     if (!categories.includes(selectedCategory)) selectedCategory = "All stays";
     elements.categories.innerHTML = categories.map((category) =>
       `<button type="button" class="category-pill${category === selectedCategory ? " selected" : ""}" data-category="${escapeHtml(category)}" aria-pressed="${category === selectedCategory}">${escapeHtml(category)}</button>`
@@ -320,6 +365,17 @@
     $("#results-count").innerHTML = `<strong>${filtered.length}</strong> ${filtered.length === 1 ? "stay" : "stays"} to fall for`;
     $("#results-dates").textContent = `${Booking.getNights(searchCheckin, searchCheckout)} nights · ${searchGuests} ${searchGuests === 1 ? "guest" : "guests"}`;
     $("#empty-offerings").classList.toggle("hidden", filtered.length > 0);
+    if (selectedCategory === "Favorites") {
+      $("#empty-offerings h3").textContent = state.favorites.length
+        ? "No saved places match these filters"
+        : "No favorites saved yet";
+      $("#empty-offerings p").textContent = state.favorites.length
+        ? "Try changing the dates, guest count, or search filters."
+        : "Tap the heart on any stay to save it here for later.";
+    } else {
+      $("#empty-offerings h3").textContent = "No places for those dates";
+      $("#empty-offerings p").textContent = "Try a different destination, guest count, or check-in date.";
+    }
   }
 
   function renderStayMap(offerings) {
@@ -626,6 +682,17 @@
     const formData = new FormData(event.currentTarget);
     const error = $("#form-error");
     const button = $('button[type="submit"]', event.currentTarget);
+    const offering = state.offerings.find((item) => item.id === activeOfferingId);
+    const checkin = $("#booking-checkin").value;
+    const checkout = $("#booking-checkout").value;
+    const nights = Booking.getNights(checkin, checkout);
+    const guests = Number(formData.get("guests"));
+    const confirmed = await requestConfirmation({
+      title: "Confirm your booking?",
+      message: `Review your stay at ${offering ? offering.name : "this property"}: ${stayDates(checkin, checkout)}, ${nights} ${nights === 1 ? "night" : "nights"}, ${guests} ${guests === 1 ? "guest" : "guests"}. Estimated total: ${money(Number(offering && offering.price) * nights)}. This will create a reservation.`,
+      confirmLabel: "Confirm booking"
+    });
+    if (!confirmed) return;
     button.disabled = true;
     let booking;
     try {
@@ -817,6 +884,12 @@
       amenities: data.get("amenities").split(",").map((item) => item.trim()).filter(Boolean), days
     };
     const submit = $('button[type="submit"]', event.currentTarget);
+    const confirmed = await requestConfirmation({
+      title: previous ? "Save listing changes?" : "Publish this property?",
+      message: `${previous ? "Save your updates to" : "Publish"} “${updated.name}” in ${updated.location} at ${money(updated.price)} per night? ${imageFile && imageFile.size ? "The attached property photo will be uploaded." : ""} Your listing will be visible to Gather visitors.`,
+      confirmLabel: previous ? "Save changes" : "Publish listing"
+    });
+    if (!confirmed) return;
     submit.disabled = true;
     let uploadedImage = null;
     try {
@@ -857,10 +930,15 @@
     const offering = state.offerings.find((item) => item.id === id);
     if (!offering || !currentUser || offering.ownerId !== currentUser.id) return;
     const activeBookings = state.bookings.filter((booking) => booking.offeringId === id && booking.status !== "cancelled");
-    const prompt = activeBookings.length
-      ? `This place has ${activeBookings.length} active reservation${activeBookings.length === 1 ? "" : "s"}. Remove it and cancel those reservations?`
-      : `Remove “${offering.name}” from your listings?`;
-    if (!window.confirm(prompt)) return;
+    const confirmed = await requestConfirmation({
+      title: "Remove this listing?",
+      message: activeBookings.length
+        ? `Remove “${offering.name}”? This will also cancel ${activeBookings.length} active reservation${activeBookings.length === 1 ? "" : "s"} and guests will no longer be able to book this place.`
+        : `Remove “${offering.name}” from your listings? Guests will no longer be able to book it.`,
+      confirmLabel: "Remove listing",
+      danger: true
+    });
+    if (!confirmed) return;
     try {
       await GatherData.deleteOffering(id);
       state.offerings.splice(state.offerings.indexOf(offering), 1);
@@ -882,7 +960,13 @@
   async function cancelBooking(id) {
     const booking = state.bookings.find((item) => item.id === id);
     if (!booking || !currentUser || booking.accountId !== currentUser.id || booking.status === "cancelled") return;
-    if (!window.confirm(`Cancel your ${booking.nights}-night stay at ${booking.offeringName}?`)) return;
+    const confirmed = await requestConfirmation({
+      title: "Cancel this booking?",
+      message: `Cancel your ${booking.nights}-night stay at ${booking.offeringName}, ${stayDates(booking.checkin, booking.checkout)}? This cannot be undone, and the dates will become available again.`,
+      confirmLabel: "Cancel booking",
+      danger: true
+    });
+    if (!confirmed) return;
     try {
       await GatherData.cancelBooking(id);
       booking.status = "cancelled";
@@ -999,6 +1083,14 @@
     navigate("search");
   }));
   document.addEventListener("click", async (event) => {
+    if (event.target.closest("[data-confirm-accept]")) {
+      closeConfirmation(true);
+      return;
+    }
+    if (event.target.closest("[data-confirm-cancel]") || event.target === $("#confirmation-modal")) {
+      closeConfirmation(false);
+      return;
+    }
     if (event.target.closest("#account-button")) {
       if (!currentUser) {
         openAuthModal("signin", "guest", null);
@@ -1013,6 +1105,12 @@
     if (accountAction) {
       const action = accountAction.dataset.accountAction;
       if (action === "signout") {
+        const confirmed = await requestConfirmation({
+          title: "Sign out of Gather?",
+          message: "You’ll be signed out on this device. Your account, listings, and bookings will remain saved.",
+          confirmLabel: "Sign out"
+        });
+        if (!confirmed) return;
         try { await endSession(); }
         catch (error) {
           console.error("Could not sign out of Gather.", error);
@@ -1055,6 +1153,7 @@
         await GatherData.setFavorite(currentUser.id, offeringId, active);
         if (active) state.favorites.push(offeringId);
         else state.favorites.splice(state.favorites.indexOf(offeringId), 1);
+        if (activeTab === "search" && selectedCategory === "Favorites") renderOfferings();
         favorite.classList.toggle("saved", active);
         favorite.textContent = active ? "♥" : "♡";
         favorite.setAttribute("aria-pressed", String(active));
@@ -1091,6 +1190,26 @@
     }
   });
   document.addEventListener("keydown", (event) => {
+    if (pendingConfirmation) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeConfirmation(false);
+        return;
+      }
+      if (event.key === "Tab") {
+        const controls = $$(".confirmation-dialog button").filter((button) => !button.disabled);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+    }
     if (event.key === "Escape" && !elements.modal.classList.contains("hidden")) closeModal();
   });
   GatherData.onAuthStateChange((account) => {
