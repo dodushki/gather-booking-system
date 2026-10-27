@@ -1104,6 +1104,7 @@
   async function initialize() {
     try {
       currentUser = await GatherData.getCurrentProfile();
+      renderAccountButton();
       await refreshSharedData();
     } catch (error) {
       console.error("Could not connect to the shared Gather database.", error);
