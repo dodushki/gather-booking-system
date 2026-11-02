@@ -93,6 +93,13 @@
             Number.isFinite(offering.longitude) && offering.longitude >= 115 && offering.longitude <= 128
           ), "Every sample stay should have map coordinates in the Philippines");
         });
+        test("uses locally stored destination photos and upgrades cached sample images", function () {
+          assert(api.DEFAULT_OFFERINGS.every((offering) => /^assets\/stays\/[a-z0-9-]+\.jpg$/.test(offering.image)), "Every starter stay should use a local destination photo");
+          const cached = api.withDefaultOfferings([{ ...state.offerings[0], image: "photo-1510414842594-a61c69b5ae57" }]);
+          assert(cached.find((offering) => offering.id === "isla-norte").image === "assets/stays/siargao-cloud9.jpg", "Old cached sample photos should migrate to the destination image");
+          const hostListing = api.withDefaultOfferings([{ id: "host-place", name: "Host place", image: "https://example.test/host-photo.jpg", days: [], amenities: [] }]);
+          assert(hostListing.find((offering) => offering.id === "host-place").image === "https://example.test/host-photo.jpg", "Host-uploaded photos should remain unchanged");
+        });
         test("adds new sample stays to saved inventory without replacing host listings", function () {
           const saved = state.offerings.slice(0, 4).map((offering) => ({ ...offering, price: offering.price + 100 }));
           saved.push({ id: "host-place", name: "Host place", category: "Guest houses", location: "Cebu City, Philippines", price: 3000, days: [0, 1, 2, 3, 4, 5, 6], amenities: [] });
@@ -140,6 +147,17 @@
           throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin: "2030-01-05", checkout, guests: 2, name: "Alex Doe", email: "alex@example.com" }, now), "future");
         });
         async function finish() {
+          await testAsync("serves all starter destination photos locally", async function () {
+            const responses = await Promise.all(api.DEFAULT_OFFERINGS.map((offering) => fetch(offering.image)));
+            assert(responses.every((response) => response.ok && response.headers.get("content-type").startsWith("image/jpeg")), "Every starter photo should load as a local JPEG");
+          });
+          await testAsync("includes a safe image migration for existing starter stays", async function () {
+            const response = await fetch("./supabase-schema.sql");
+            assert(response.ok, "The Supabase schema should be available");
+            const schema = await response.text();
+            assert(schema.includes("where id = 'isla-norte' and image = 'photo-1510414842594-a61c69b5ae57'"), "The schema should update only an unchanged default photo for existing stays");
+            assert(schema.includes("'assets/stays/siargao-cloud9.jpg'"), "The schema should seed the local destination photo");
+          });
           await testAsync("starts a shared anonymous guest session with the entered name", async function () {
             const client = window.GatherSupabase.client;
             const originalSignInAnonymously = client.auth.signInAnonymously;
@@ -186,6 +204,7 @@
             const shared = await window.GatherSupabase.loadData(null);
             assert(shared.offerings.length >= 8, "Supabase should return all starter stays, even when hosts have added more");
             assert(shared.offerings.some((offering) => offering.id === "isla-norte"), "Supabase should include the Siargao sample stay");
+            assert(shared.offerings.filter((offering) => api.DEFAULT_OFFERINGS.some((sample) => sample.id === offering.id)).every((offering) => !/^photo-[\w-]+$/.test(offering.image || "")), "Legacy generic sample photos should resolve to the local destination photos");
             assert(shared.bookings.length === 0 && shared.favorites.length === 0, "Signed-out loading must not expose private bookings or favorites");
             assert(Array.isArray(shared.unavailableDates), "Public availability should be returned separately from private booking details");
           });

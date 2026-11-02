@@ -6,6 +6,7 @@
   }
 
   const client = window.supabase.createClient(config.url, config.publishableKey);
+  const defaultImages = new Map(window.GatherBooking.DEFAULT_OFFERINGS.map((offering) => [offering.id, offering.image]));
 
   function throwIfError(result) {
     if (result.error) throw new Error(result.error.message || "The shared Gather service returned an error.");
@@ -23,7 +24,8 @@
       description: row.description, location: row.location, latitude: row.latitude,
       longitude: row.longitude, price: row.price, rating: row.rating, reviews: row.reviews,
       guests: row.guests, bedrooms: row.bedrooms, bathrooms: row.bathrooms, icon: row.icon,
-      image: row.image, badge: row.badge, amenities: row.amenities || [], days: row.days || [],
+      image: /^photo-[\w-]+$/.test(row.image || "") ? (defaultImages.get(row.id) || row.image) : row.image,
+      badge: row.badge, amenities: row.amenities || [], days: row.days || [],
       minimumNights: row.minimum_nights
     };
   }

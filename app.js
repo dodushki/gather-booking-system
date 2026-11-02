@@ -106,6 +106,7 @@
 
   function photoUrl(image, width) {
     if (/^https?:\/\//i.test(String(image || ""))) return image;
+    if (/^(?:\/|\.\/|assets\/)/i.test(String(image || ""))) return image;
     return `https://images.unsplash.com/${encodeURIComponent(image || "photo-1449158743715-0a90ebb6d2d8")}?auto=format&fit=crop&w=${width || 900}&q=80`;
   }
 
@@ -420,7 +421,7 @@
       <article class="offering-card">
         <div class="card-photo-wrap">
           <button type="button" class="photo-button" data-open-offering="${escapeHtml(offering.id)}" aria-label="View ${escapeHtml(offering.name)} and dates">
-            <img class="card-photo" src="${photoUrl(offering.image)}" alt="${escapeHtml(offering.name)}, ${escapeHtml(offering.location)}" loading="lazy">
+            <img class="card-photo" src="${photoUrl(offering.image)}" alt="Representative destination photo for ${escapeHtml(offering.location)}" loading="lazy">
             <span class="card-badge">${escapeHtml(offering.badge || offering.category)}</span>
           </button>
           <button type="button" class="favorite-button${state.favorites.includes(offering.id) ? " saved" : ""}" data-favorite="${escapeHtml(offering.id)}" aria-label="${state.favorites.includes(offering.id) ? "Remove" : "Save"} ${escapeHtml(offering.name)} ${state.favorites.includes(offering.id) ? "from" : "to"} favorites" aria-pressed="${state.favorites.includes(offering.id)}">${state.favorites.includes(offering.id) ? "♥" : "♡"}</button>
@@ -734,7 +735,7 @@
     const checkin = searchCheckin;
     const checkout = searchCheckout;
     elements.modalContent.innerHTML = `
-    <div class="modal-property"><img class="modal-photo" src="${photoUrl(offering.image, 1000)}" alt="${escapeHtml(offering.name)}"><span class="modal-kicker">${escapeHtml(offering.badge || offering.category)} · ${Number(offering.rating || 4.6).toFixed(1)} ★</span><h2 id="modal-title">${escapeHtml(offering.name)}</h2><p class="modal-location">${escapeHtml(offering.location)} · ${Number(offering.guests)} guests · ${Number(offering.bedrooms || 1)} bedroom${Number(offering.bedrooms) === 1 ? "" : "s"}</p><p class="modal-description">${escapeHtml(offering.description)}</p><div class="modal-amenities">${(offering.amenities || []).map((amenity) => `<span>${escapeHtml(amenity)}</span>`).join("")}</div></div>
+    <div class="modal-property"><img class="modal-photo" src="${photoUrl(offering.image, 1000)}" alt="Representative destination photo for ${escapeHtml(offering.location)}"><span class="modal-kicker">${escapeHtml(offering.badge || offering.category)} · ${Number(offering.rating || 4.6).toFixed(1)} ★</span><h2 id="modal-title">${escapeHtml(offering.name)}</h2><p class="modal-location">${escapeHtml(offering.location)} · ${Number(offering.guests)} guests · ${Number(offering.bedrooms || 1)} bedroom${Number(offering.bedrooms) === 1 ? "" : "s"}</p><p class="modal-description">${escapeHtml(offering.description)}</p><div class="modal-amenities">${(offering.amenities || []).map((amenity) => `<span>${escapeHtml(amenity)}</span>`).join("")}</div></div>
       <form class="booking-form" id="booking-form"><div class="picker-heading"><div><span class="step-number">01</span><strong>Choose your dates</strong></div><span>Make it a little escape</span></div>${dateInputsMarkup(checkin, checkout, "booking")}
         <label class="guest-input">Guests<select name="guests">${Array.from({ length: Number(offering.guests) }, (_, index) => index + 1).map((guests) => `<option value="${guests}"${guests === Math.min(searchGuests, Number(offering.guests)) ? " selected" : ""}>${guests} ${guests === 1 ? "guest" : "guests"}</option>`).join("")}</select></label>
         <div class="picker-heading details-heading"><div><span class="step-number">02</span><strong>Your details</strong></div><span>Almost there</span></div>

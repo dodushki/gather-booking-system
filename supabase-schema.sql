@@ -317,16 +317,33 @@ grant select on public.profiles to authenticated;
 grant select, insert, delete on public.favorites to authenticated;
 grant usage on schema public to anon, authenticated;
 
+update public.offerings set image = 'assets/stays/siargao-cloud9.jpg'
+where id = 'isla-norte' and image = 'photo-1510414842594-a61c69b5ae57';
+update public.offerings set image = 'assets/stays/baguio-camp-john-hay.jpg'
+where id = 'amihan-cabin' and image = 'photo-1449158743715-0a90ebb6d2d8';
+update public.offerings set image = 'assets/stays/alona-beach-panglao.jpg'
+where id = 'bahay-tala' and image = 'photo-1500375592092-40eb2168fd21';
+update public.offerings set image = 'assets/stays/coron-twin-lagoon.jpg'
+where id = 'coron-cove' and image = 'photo-1507525428034-b723cf961d3e';
+update public.offerings set image = 'assets/stays/makati-skyline.jpg'
+where id = 'luntian-city-hotel' and image = 'photo-1566073771259-6a8506099945';
+update public.offerings set image = 'assets/stays/bgc-burgos-circle.jpg'
+where id = 'bgc-serviced-suite' and image = 'photo-1522708323590-d24dbb6b0267';
+update public.offerings set image = 'assets/stays/vigan-calle-crisologo.jpg'
+where id = 'vigan-heritage-inn' and image = 'photo-1511818966892-d7d671e672a2';
+update public.offerings set image = 'assets/stays/tagaytay-taal.jpg'
+where id = 'tagaytay-farmstay' and image = 'photo-1500382017468-9049fed747ef';
+
 insert into public.offerings (
   id, name, category, description, location, latitude, longitude, price, rating, reviews,
   guests, bedrooms, bathrooms, icon, image, badge, amenities, days, minimum_nights
 ) values
-  ('isla-norte', 'Isla Norte Beach House', 'Island stays', 'A breezy island hideaway, a swim before breakfast, and nowhere else you need to be.', 'General Luna, Siargao, Philippines', 9.7802, 126.1583, 6800, 4.8, 124, 4, 2, 1, '⌂', 'photo-1510414842594-a61c69b5ae57', 'Guest favorite', array['Beach access','Air conditioning','Kitchen'], array[0,1,2,3,4,5,6]::smallint[], 2),
-  ('amihan-cabin', 'Amihan Mountain Cabin', 'Mountain escapes', 'Cool mornings, pine-scented air, and a slow cup of coffee above the city.', 'Baguio City, Benguet, Philippines', 16.4023, 120.5960, 4200, 4.9, 86, 4, 2, 1, '♧', 'photo-1449158743715-0a90ebb6d2d8', 'Exceptional', array['Mountain view','Fire pit','Kitchen'], array[0,1,2,3,4,5,6]::smallint[], 1),
-  ('bahay-tala', 'Bahay Tala by the Sea', 'Beachfront stays', 'Barefoot mornings, a hammock in the shade, and the sea just beyond the deck.', 'Panglao Island, Bohol, Philippines', 9.5805, 123.7371, 8900, 4.8, 59, 4, 2, 2, '❋', 'photo-1500375592092-40eb2168fd21', 'A little slice of paradise', array['Sea view','Pool','Breakfast'], array[0,1,2,3,4,5,6]::smallint[], 2),
-  ('coron-cove', 'Coron Cove Cottage', 'Island stays', 'An easy island base for lagoon days, salty swims, and dinner under the stars.', 'Coron, Palawan, Philippines', 11.9986, 120.2043, 5400, 4.7, 207, 3, 2, 1, '〰', 'photo-1507525428034-b723cf961d3e', 'Rare island find', array['Island views','Garden','Airport transfer'], array[0,1,2,3,4,5,6]::smallint[], 2),
-  ('luntian-city-hotel', 'Luntian City Hotel', 'City hotels', 'A calm, leafy hideaway in the middle of Makati, close to galleries, cafés, and the business district.', 'Makati City, Metro Manila, Philippines', 14.5547, 121.0244, 5200, 4.6, 318, 2, 1, 1, '⌂', 'photo-1566073771259-6a8506099945', 'City favorite', array['Rooftop pool','Breakfast','Wi-Fi'], array[0,1,2,3,4,5,6]::smallint[], 1),
-  ('bgc-serviced-suite', 'BGC Garden Suite', 'Serviced apartments', 'A light-filled apartment with room to settle in, steps from parks, restaurants, and city life.', 'Bonifacio Global City, Taguig, Philippines', 14.5502, 121.0497, 6100, 4.7, 142, 3, 1, 1, '⌂', 'photo-1522708323590-d24dbb6b0267', 'Room to settle in', array['Kitchen','Work desk','City view'], array[0,1,2,3,4,5,6]::smallint[], 1),
-  ('vigan-heritage-inn', 'Casa de Abel Heritage Inn', 'Heritage inns', 'Stay in a lovingly restored Vigan home, with a quiet courtyard just off the cobbled old town.', 'Vigan City, Ilocos Sur, Philippines', 17.5747, 120.3869, 3900, 4.8, 94, 2, 1, 1, '⌂', 'photo-1511818966892-d7d671e672a2', 'A heritage hideaway', array['Heritage home','Courtyard','Breakfast'], array[0,1,2,3,4,5,6]::smallint[], 1),
-  ('tagaytay-farmstay', 'Hapag Farm Stay', 'Farm stays', 'Slow mornings, garden-to-table meals, and cool countryside air with a view of Taal.', 'Tagaytay, Cavite, Philippines', 14.1153, 120.9621, 4800, 4.8, 76, 4, 2, 1, '♧', 'photo-1500382017468-9049fed747ef', 'Countryside favorite', array['Garden','Farm breakfast','Taal view'], array[0,1,2,3,4,5,6]::smallint[], 1)
+  ('isla-norte', 'Isla Norte Beach House', 'Island stays', 'A breezy island hideaway, a swim before breakfast, and nowhere else you need to be.', 'General Luna, Siargao, Philippines', 9.7802, 126.1583, 6800, 4.8, 124, 4, 2, 1, '⌂', 'assets/stays/siargao-cloud9.jpg', 'Guest favorite', array['Beach access','Air conditioning','Kitchen'], array[0,1,2,3,4,5,6]::smallint[], 2),
+  ('amihan-cabin', 'Amihan Mountain Cabin', 'Mountain escapes', 'Cool mornings, pine-scented air, and a slow cup of coffee above the city.', 'Baguio City, Benguet, Philippines', 16.4023, 120.5960, 4200, 4.9, 86, 4, 2, 1, '♧', 'assets/stays/baguio-camp-john-hay.jpg', 'Exceptional', array['Mountain view','Fire pit','Kitchen'], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('bahay-tala', 'Bahay Tala by the Sea', 'Beachfront stays', 'Barefoot mornings, a hammock in the shade, and the sea just beyond the deck.', 'Panglao Island, Bohol, Philippines', 9.5805, 123.7371, 8900, 4.8, 59, 4, 2, 2, '❋', 'assets/stays/alona-beach-panglao.jpg', 'A little slice of paradise', array['Sea view','Pool','Breakfast'], array[0,1,2,3,4,5,6]::smallint[], 2),
+  ('coron-cove', 'Coron Cove Cottage', 'Island stays', 'An easy island base for lagoon days, salty swims, and dinner under the stars.', 'Coron, Palawan, Philippines', 11.9986, 120.2043, 5400, 4.7, 207, 3, 2, 1, '〰', 'assets/stays/coron-twin-lagoon.jpg', 'Rare island find', array['Island views','Garden','Airport transfer'], array[0,1,2,3,4,5,6]::smallint[], 2),
+  ('luntian-city-hotel', 'Luntian City Hotel', 'City hotels', 'A calm, leafy hideaway in the middle of Makati, close to galleries, cafés, and the business district.', 'Makati City, Metro Manila, Philippines', 14.5547, 121.0244, 5200, 4.6, 318, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'City favorite', array['Rooftop pool','Breakfast','Wi-Fi'], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('bgc-serviced-suite', 'BGC Garden Suite', 'Serviced apartments', 'A light-filled apartment with room to settle in, steps from parks, restaurants, and city life.', 'Bonifacio Global City, Taguig, Philippines', 14.5502, 121.0497, 6100, 4.7, 142, 3, 1, 1, '⌂', 'assets/stays/bgc-burgos-circle.jpg', 'Room to settle in', array['Kitchen','Work desk','City view'], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('vigan-heritage-inn', 'Casa de Abel Heritage Inn', 'Heritage inns', 'Stay in a lovingly restored Vigan home, with a quiet courtyard just off the cobbled old town.', 'Vigan City, Ilocos Sur, Philippines', 17.5747, 120.3869, 3900, 4.8, 94, 2, 1, 1, '⌂', 'assets/stays/vigan-calle-crisologo.jpg', 'A heritage hideaway', array['Heritage home','Courtyard','Breakfast'], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('tagaytay-farmstay', 'Hapag Farm Stay', 'Farm stays', 'Slow mornings, garden-to-table meals, and cool countryside air with a view of Taal.', 'Tagaytay, Cavite, Philippines', 14.1153, 120.9621, 4800, 4.8, 76, 4, 2, 1, '♧', 'assets/stays/tagaytay-taal.jpg', 'Countryside favorite', array['Garden','Farm breakfast','Taal view'], array[0,1,2,3,4,5,6]::smallint[], 1)
 on conflict (id) do nothing;
