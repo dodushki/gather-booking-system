@@ -294,6 +294,7 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
 .note-foot { position: relative; z-index: 1; color: #758477; font-size: 8px; font-weight: 700; letter-spacing: 1px; }
 .modal-backdrop { z-index: 20; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: 20px; background: rgba(24, 39, 31, .49); backdrop-filter: blur(3px); }
 .modal { position: relative; width: min(100%, 590px); max-height: min(92vh, 880px); overflow-y: auto; padding: 28px 32px 26px; border-radius: 4px; background: #fff; box-shadow: 0 18px 70px rgba(0, 0, 0, .19); }
+.modal.auth-modal { width: min(100%, 640px); max-height: min(90vh, 760px); border: 1px solid #e3ebe5; border-radius: 14px; padding: 42px clamp(28px, 6vw, 58px) 36px; box-shadow: 0 24px 80px rgba(13, 30, 20, .25); }
 .confirmation-backdrop { z-index: 30; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: 18px; background: rgba(24, 39, 31, .56); backdrop-filter: blur(3px); }
 .confirmation-dialog { width: min(100%, 420px); border: 1px solid #e4e9e5; border-radius: 8px; padding: 27px; background: #fff; box-shadow: 0 18px 70px rgba(0,0,0,.24); }
 .confirmation-mark { width: 36px; height: 36px; display: grid; place-items: center; margin-bottom: 14px; border-radius: 50%; background: #edf3ee; color: var(--green-dark); font-family: var(--serif); font-size: 23px; }
@@ -370,19 +371,21 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
 .account-menu-link:hover { background: #f6f9f6; }
 .account-menu-link span { color: #87988b; }
 .account-menu-link.signout-link { color: #748077; }
-.auth-heading { margin: 3px 0 22px; text-align: center; }
-.auth-logo { width: 38px; height: 38px; display: grid; place-items: center; margin: 0 auto 13px; border-radius: 50%; background: var(--green); color: #fff; font-family: var(--serif); font-size: 28px; font-style: italic; }
+.auth-heading { margin: 3px 0 30px; text-align: center; }
+.auth-logo { width: 46px; height: 46px; display: grid; place-items: center; margin: 0 auto 16px; border-radius: 50%; background: var(--green); color: #fff; font-family: var(--serif); font-size: 32px; font-style: italic; }
 .auth-heading .modal-kicker { color: var(--green); }
-.auth-heading h2 { margin: 8px 0; font-family: var(--serif); font-size: 32px; font-weight: 500; }
-.auth-heading > p:last-child { max-width: 330px; margin: 0 auto; color: #79867d; font-size: 10px; line-height: 1.65; }
-.auth-form { display: grid; gap: 12px; }
-.auth-form label { display: flex; flex-direction: column; gap: 5px; color: #59685d; font-size: 9px; font-weight: 600; }
-.auth-form input, .auth-form select { width: 100%; min-height: 38px; border: 1px solid #e0e7e1; border-radius: 2px; padding: 9px 10px; background: #fff; color: var(--ink); font-size: 11px; font-weight: 400; }
-.auth-submit { width: 100%; min-height: 42px; margin-top: 4px; }
+.auth-heading h2 { margin: 10px 0; font-family: var(--serif); font-size: 38px; font-weight: 500; }
+.auth-heading > p:last-child { max-width: 390px; margin: 0 auto; color: #66776c; font-size: 15px; line-height: 1.6; }
+.auth-form { display: grid; gap: 18px; }
+.auth-form label { display: flex; flex-direction: column; gap: 8px; color: #405b4a; font-size: 14px; font-weight: 650; }
+.auth-form input, .auth-form select { width: 100%; min-height: 52px; border: 1px solid #cbd9ce; border-radius: 6px; padding: 12px 14px; background: #fff; color: var(--ink); font-size: 16px; font-weight: 400; }
+.auth-form input::placeholder { color: #87958a; }
+.auth-form input:focus-visible, .auth-form select:focus-visible { border-color: var(--green); outline: 3px solid rgba(61, 112, 94, .18); outline-offset: 1px; }
+.auth-submit { width: 100%; min-height: 52px; margin-top: 6px; border-radius: 5px; font-size: 15px; }
 .auth-submit:disabled { opacity: .65; cursor: wait; }
-.auth-switch { margin: 17px 0 0; color: #718076; text-align: center; font-size: 10px; }
+.auth-switch { margin: 24px 0 0; color: #59685d; text-align: center; font-size: 14px; }
 .auth-switch button { border: 0; padding: 0; background: none; color: var(--green); cursor: pointer; font-size: inherit; font-weight: 700; }
-.auth-local-note { margin: 16px 0 0; border-top: 1px solid #edf0ed; padding-top: 12px; color: #9aa39b; text-align: center; font-size: 8px; }
+.auth-local-note { margin: 20px 0 0; border-top: 1px solid #edf0ed; padding-top: 14px; color: #68776e; text-align: center; font-size: 12px; }
 .toast { z-index: 30; position: fixed; right: 22px; bottom: 20px; max-width: calc(100% - 34px); border-radius: 3px; padding: 12px 16px; background: var(--green-dark); box-shadow: 0 8px 28px rgba(32, 41, 31, .19); color: white; font-size: 11px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: .2s ease; }
 .toast.visible { opacity: 1; transform: translateY(0); }
 .modal-open { overflow: hidden; }
@@ -522,6 +525,8 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
   .booking-actions .button { min-height: 34px; padding: 0 10px; font-size: 9px; }
   .modal-backdrop { align-items: flex-end; padding: 0; }
   .modal { width: 100%; max-height: 94vh; padding: 22px 18px 20px; border-radius: 9px 9px 0 0; }
+  .modal-backdrop.auth-backdrop { align-items: center; padding: 16px; }
+  .modal.auth-modal { width: min(100%, 520px); max-height: min(88vh, 720px); padding: 32px 24px max(26px, env(safe-area-inset-bottom)); border-radius: 14px; }
   .confirmation-backdrop { align-items: flex-end; padding: 10px; }
   .confirmation-dialog { width: 100%; border-radius: 12px; padding: 24px 20px max(20px, env(safe-area-inset-bottom)); }
   .confirmation-actions > button { flex: 1; }
@@ -530,6 +535,13 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
   .listing-image-field > img { width: 112px; height: 84px; }
   #property-location-map { height: 170px; }
   .modal-property h2, .modal-heading h2 { font-size: 25px; }
+  .auth-heading { margin-bottom: 24px; }
+  .auth-heading h2 { font-size: 34px; }
+  .auth-heading > p:last-child { font-size: 14px; }
+  .auth-form { gap: 15px; }
+  .auth-form label { font-size: 13px; }
+  .auth-form input, .auth-form select { min-height: 50px; font-size: 16px; }
+  .auth-switch { margin-top: 20px; font-size: 13px; }
   .signed-in-details > small { max-width: 78px; text-align: right; }
   .confirm-row { align-items: stretch; flex-direction: column; }
   .confirm-row .button { width: 100%; }

@@ -322,6 +322,8 @@
   function openAuthModal(mode, role, intent) {
     authIntent = intent || null;
     const isSignup = mode === "signup";
+    $(".modal", elements.modal).classList.add("auth-modal");
+    elements.modal.classList.add("auth-backdrop");
     elements.modalContent.innerHTML = `
       <div class="auth-heading"><span class="auth-logo" aria-hidden="true">g</span><p class="modal-kicker">${role === "host" ? "GATHER HOSTS" : "GATHER GUESTS"}</p><h2 id="modal-title">${isSignup ? "Come on in." : "Welcome back."}</h2><p>${isSignup ? (role === "host" ? "Create your host account and share a place with the Philippines." : "Create an account to save your plans and book a stay.") : "Sign in to pick up right where you left off."}</p></div>
       <form class="auth-form" id="auth-form">
@@ -338,7 +340,7 @@
     elements.modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     $("#auth-form").addEventListener("submit", submitAuth);
-    $("[data-close-modal]").focus();
+    $('[name="email"]', $("#auth-form")).focus();
   }
 
   async function submitAuth(event) {
@@ -740,6 +742,8 @@
       openAuthModal("signup", "guest", { type: "booking", offeringId });
       return;
     }
+    $(".modal", elements.modal).classList.remove("auth-modal");
+    elements.modal.classList.remove("auth-backdrop");
     activeOfferingId = offeringId;
     const checkin = searchCheckin;
     const checkout = searchCheckout;
@@ -828,6 +832,8 @@
   function closeModal() {
     elements.modal.classList.add("hidden");
     elements.modal.setAttribute("aria-hidden", "true");
+    $(".modal", elements.modal).classList.remove("auth-modal");
+    elements.modal.classList.remove("auth-backdrop");
     document.body.classList.remove("modal-open");
     if (welcomeGateRequired) showWelcomeGate();
     else {
@@ -901,6 +907,8 @@
       openAuthModal("signup", "host", { type: "manage" });
       return;
     }
+    $(".modal", elements.modal).classList.remove("auth-modal");
+    elements.modal.classList.remove("auth-backdrop");
     editingOfferingId = offering ? offering.id : null;
     const value = offering || { name: "", category: "Island stays", description: "", location: "", price: 5000, rating: 4.6, reviews: 0, guests: 2, bedrooms: 1, bathrooms: 1, icon: "⌂", image: "photo-1510414842594-a61c69b5ae57", badge: "A favorite", amenities: [], days: [0, 1, 2, 3, 4, 5, 6], minimumNights: 1 };
     elements.modalContent.innerHTML = `<div class="modal-heading form-modal-heading"><span class="modal-kicker">GATHER HOSTS · ${offering ? "YOUR LISTING" : "A NEW PLACE"}</span><h2 id="modal-title">${offering ? "A little" : "Put your place"} <em>${offering ? "update." : "on the map."}</em></h2><p>Share the details guests need to find their way to you.</p></div>

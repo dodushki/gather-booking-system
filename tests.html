@@ -204,6 +204,10 @@
             assert(markup.includes("create or manage their own listings") && markup.includes("cannot change Gather’s code, settings, or other accounts"), "Demo host permissions should allow owned listings without site administration");
             assert(markup.includes("no payment is collected") && markup.includes("no host is contacted"), "The disclaimer should clearly state that demo bookings are not real");
             assert(markup.includes('id="show-demo-disclaimer"') && markup.includes("Presentation demo") && markup.includes("Sample stays and prices; bookings are not real."), "A persistent demo notice should remain available after the welcome gate closes");
+            const appScript = await (await fetch("./app.js")).text();
+            const styles = await (await fetch("./styles.css")).text();
+            assert(appScript.includes('classList.add("auth-modal")') && appScript.includes('[name="email"]'), "The auth dialog should be separately marked and focus its first field");
+            assert(styles.includes(".modal.auth-modal { width: min(100%, 640px)") && styles.includes(".auth-form input, .auth-form select { width: 100%; min-height: 52px") && styles.includes(".modal-backdrop.auth-backdrop"), "Sign-in should have a larger panel and accessible controls without resizing the guest welcome gate");
           });
           await testAsync("loads shared Philippine stays and public availability from Supabase", async function () {
             const shared = await window.GatherSupabase.loadData(null);
