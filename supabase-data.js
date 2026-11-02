@@ -111,10 +111,11 @@
     return getProfile(data.user.id, data.user.is_anonymous);
   }
 
-  async function signInAnonymously(name) {
+  async function signInAnonymously(name, role) {
     const guestName = window.GatherBooking.validateGuestName(name);
+    const accountRole = role === "host" ? "host" : "guest";
     const result = await client.auth.signInAnonymously({
-      options: { data: { name: guestName, role: "guest" } }
+      options: { data: { name: guestName, role: accountRole } }
     });
     const data = throwIfError(result);
     if (!data.user) throw new Error("Gather could not start a guest session.");

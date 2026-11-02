@@ -34,7 +34,7 @@ Row-level security limits profile access to its owner, listings to their host fo
 
 ## Presentation guest mode
 
-The welcome screen explains that Gather is a student presentation demo. Visitors can enter a name and continue without an email address or password. Guest profiles use Supabase anonymous authentication, so each guest can see and manage only their own trips and favorites; hosts can see guest names on reservations for their listings. Guest bookings update shared availability but do not contact a host, send an email, arrange a real stay, or collect payment. Demo reservations remain in the shared database if a guest ends the session; after signing out, that guest can no longer view or cancel them. Enable Anonymous Sign-Ins in the Supabase dashboard before presenting.
+The welcome screen explains that Gather is a student presentation demo. Visitors can enter a name to continue as a guest, or start the built-in **Gather Demo Host**, without an email address, password, or signup. The demo host uses Supabase anonymous authentication with the host role: they can browse, save favorites, book stays, and create or manage their own listings, but have no site-administration, settings, or code access. Hosts can see guest names on reservations for their own listings. Guest bookings update shared availability but do not contact a host, send an email, arrange a real stay, or collect payment. Anonymous sessions remain on the browser where they were created; after signing out, the user can no longer access their trips or manage their listings. Enable Anonymous Sign-Ins in the Supabase dashboard before presenting.
 
 ## Data and scope
 

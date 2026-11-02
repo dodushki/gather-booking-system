@@ -121,20 +121,25 @@
     const guestForm = $("#guest-entry-form");
     const continueButton = $("#welcome-continue-session");
     const submitButton = $("#guest-entry-submit");
+    const demoHostButton = $("#demo-host-entry");
     const hasSession = Boolean(currentUser);
     guestForm.classList.toggle("hidden", hasSession);
     continueButton.classList.toggle("hidden", !hasSession);
+    demoHostButton.classList.toggle("hidden", hasSession);
     $(".welcome-signin").classList.toggle("hidden", hasSession);
     if (hasSession) {
       continueButton.innerHTML = `Continue as ${escapeHtml(currentUser.name)} <span aria-hidden="true">→</span>`;
     }
     submitButton.disabled = isInitializing || Boolean(sharedServiceError);
+    demoHostButton.disabled = isInitializing || Boolean(sharedServiceError);
     $("#welcome-status").textContent = isInitializing
       ? "Connecting to Gather’s shared demo…"
       : sharedServiceError
         ? `The shared demo is unavailable right now: ${sharedServiceError}`
         : hasSession
-          ? currentUser.isAnonymous
+          ? currentUser.isAnonymous && currentUser.role === "host"
+            ? "Your demo host session is ready on this browser."
+            : currentUser.isAnonymous
             ? "Your guest session is ready on this browser."
             : "Your account is ready."
           : "Your name will be saved with your demo bookings.";
@@ -173,19 +178,21 @@
 
   async function submitGuestEntry(event) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const button = $("#guest-entry-submit");
+    await startGuestSession(new FormData(event.currentTarget).get("name"), $("#guest-entry-submit"));
+  }
+
+  async function startGuestSession(nameInput, button, role) {
     const error = $("#guest-entry-error");
     try {
-      const name = Booking.validateGuestName(new FormData(form).get("name"));
+      const name = Booking.validateGuestName(nameInput);
       error.classList.add("hidden");
       button.disabled = true;
-      button.textContent = "Starting your guest session…";
-      const account = await GatherData.signInAnonymously(name);
+      button.textContent = role === "host" ? "Starting your demo host session…" : "Starting your guest session…";
+      const account = await GatherData.signInAnonymously(name, role);
       await startSession(account);
       dismissWelcomeGate();
       navigate("home", false);
-      showToast(`Welcome, ${account.name.split(/\s+/)[0]}. Your demo guest session is ready.`);
+      showToast(`Welcome, ${account.name.split(/\s+/)[0]}. Your demo ${role === "host" ? "host" : "guest"} session is ready.`);
     } catch (caught) {
       const message = /anonymous.*disabled|disabled.*anonymous/i.test(caught.message)
         ? "Guest access is not enabled yet. In Supabase, open Authentication → Sign In / Providers and enable Anonymous Sign-Ins."
@@ -193,7 +200,9 @@
       error.textContent = message;
       error.classList.remove("hidden");
       button.disabled = Boolean(sharedServiceError);
-      button.innerHTML = 'Continue as a guest <span aria-hidden="true">→</span>';
+      button.innerHTML = button.id === "demo-host-entry"
+        ? 'Continue as demo host <span aria-hidden="true">→</span>'
+        : 'Continue as a guest <span aria-hidden="true">→</span>';
     }
   }
 
@@ -305,7 +314,7 @@
     $(".profile-dot", button).textContent = currentUser.name.trim().charAt(0).toUpperCase();
     button.setAttribute("aria-label", `Account menu for ${currentUser.name}`);
     $("#account-dropdown").innerHTML = `
-      <div class="account-menu-heading"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><small>${currentUser.isAnonymous ? "Presentation guest · no email collected" : escapeHtml(currentUser.email)}</small><span class="account-role">${currentUser.isAnonymous ? "GATHER DEMO GUEST" : currentUser.role === "host" ? "GATHER HOST" : "GATHER GUEST"}</span></div></div>
+      <div class="account-menu-heading"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><small>${currentUser.isAnonymous ? "Presentation session · no email collected" : escapeHtml(currentUser.email)}</small><span class="account-role">${currentUser.isAnonymous ? currentUser.role === "host" ? "GATHER DEMO HOST" : "GATHER DEMO GUEST" : currentUser.role === "host" ? "GATHER HOST" : "GATHER GUEST"}</span></div></div>
       <button type="button" class="account-menu-link" data-account-action="${currentUser.role === "host" ? "manage" : "bookings"}">${currentUser.role === "host" ? "Your host dashboard" : "Your trips"} <span>→</span></button>
       <button type="button" class="account-menu-link signout-link" data-account-action="signout">Sign out</button>`;
   }
@@ -739,7 +748,7 @@
       <form class="booking-form" id="booking-form"><div class="picker-heading"><div><span class="step-number">01</span><strong>Choose your dates</strong></div><span>Make it a little escape</span></div>${dateInputsMarkup(checkin, checkout, "booking")}
         <label class="guest-input">Guests<select name="guests">${Array.from({ length: Number(offering.guests) }, (_, index) => index + 1).map((guests) => `<option value="${guests}"${guests === Math.min(searchGuests, Number(offering.guests)) ? " selected" : ""}>${guests} ${guests === 1 ? "guest" : "guests"}</option>`).join("")}</select></label>
         <div class="picker-heading details-heading"><div><span class="step-number">02</span><strong>Your details</strong></div><span>Almost there</span></div>
-        <div class="signed-in-details"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><span>${currentUser.isAnonymous ? "Presentation guest" : escapeHtml(currentUser.email)}</span></div><small>${currentUser.isAnonymous ? "Demo session" : "Booking as a Gather guest"}</small></div>
+        <div class="signed-in-details"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><span>${currentUser.isAnonymous ? currentUser.role === "host" ? "Demo host · no email account" : "Presentation guest" : escapeHtml(currentUser.email)}</span></div><small>${currentUser.isAnonymous ? "Demo session" : "Booking as a Gather guest"}</small></div>
         <label class="notes-label">A note for your host <span>Optional</span><textarea name="notes" rows="2" maxlength="400" placeholder="Anything you’d like them to know?"></textarea></label>
         ${currentUser.isAnonymous ? `<p class="booking-email-disclosure">This is a shared demo booking only. It will not be sent to a host, and no payment is collected.</p>` : `<p class="booking-email-disclosure">Your booking contact details will be shared with Gather’s admin for email notification.</p>`}
         <div class="confirm-row"><div><strong id="booking-total">${money(offering.price * Booking.getNights(checkin, checkout))}</strong><span> · ${money(offering.price)} per night</span><small id="booking-nights">${Booking.getNights(checkin, checkout)} nights</small></div><button class="button button-dark" type="submit">${currentUser.isAnonymous ? "Add demo booking" : "Reserve your stay"} <span aria-hidden="true">→</span></button></div><p class="form-error hidden" id="form-error" role="alert"></p>
@@ -1103,6 +1112,7 @@
       if (isCustom && !customGuestCount.value) customGuestCount.value = "9";
     });
     $("#guest-entry-form").addEventListener("submit", submitGuestEntry);
+    $("#demo-host-entry").addEventListener("click", () => startGuestSession("Gather Demo Host", $("#demo-host-entry"), "host"));
     $("#welcome-signin").addEventListener("click", openWelcomeSignIn);
     $("#show-demo-disclaimer").addEventListener("click", showDemoDisclaimer);
     $("#welcome-continue-session").addEventListener("click", () => {
@@ -1209,9 +1219,11 @@
       const action = accountAction.dataset.accountAction;
       if (action === "signout") {
         const confirmed = await requestConfirmation({
-          title: currentUser.isAnonymous ? "End this guest session?" : "Sign out of Gather?",
+          title: currentUser.isAnonymous ? "End this demo session?" : "Sign out of Gather?",
           message: currentUser.isAnonymous
-            ? "This browser will lose access to your guest trip list. Any demo bookings you made will remain in shared availability, but you will no longer be able to view or cancel them."
+            ? currentUser.role === "host"
+              ? "This browser will lose access to your demo host session. Your listings and demo bookings will remain in shared Gather data, but you will no longer be able to manage those listings or view or cancel your bookings."
+              : "This browser will lose access to your guest trip list. Any demo bookings you made will remain in shared availability, but you will no longer be able to view or cancel them."
             : "You’ll be signed out on this device. Your account, listings, and bookings will remain saved.",
           confirmLabel: "Sign out"
         });

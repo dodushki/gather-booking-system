@@ -176,7 +176,7 @@
                   return this;
                 },
                 single: async function () {
-                  return { data: { id: "guest-test", name: "Jamie Lee", email: null, role: "guest" }, error: null };
+                  return { data: { id: "guest-test", name: "Jamie Lee", email: null, role: authOptions.options.data.role }, error: null };
                 }
               };
             };
@@ -185,6 +185,9 @@
               assert(account.id === "guest-test" && account.name === "Jamie Lee", "Should return the created guest profile");
               assert(account.role === "guest" && account.isAnonymous && account.email === null, "Guest profile should be anonymous and require no email");
               assert(authOptions.options.data.name === "Jamie Lee" && authOptions.options.data.role === "guest", "Should save the trimmed guest name as guest metadata");
+              const hostAccount = await window.GatherSupabase.signInAnonymously("Gather Demo Host", "host");
+              assert(hostAccount.role === "host" && hostAccount.isAnonymous && hostAccount.email === null, "Demo host sessions should use the host role without an email account");
+              assert(authOptions.options.data.name === "Gather Demo Host" && authOptions.options.data.role === "host", "Should create the demo host with host metadata");
             } finally {
               client.auth.signInAnonymously = originalSignInAnonymously;
               client.from = originalFrom;
@@ -197,6 +200,8 @@
             assert(markup.includes('id="welcome-gate"') && markup.includes('aria-modal="true"'), "The welcome disclaimer should be a modal gate");
             assert(markup.includes('id="app-shell" inert aria-hidden="true"'), "The app should be inaccessible until the guest acknowledges the gate");
             assert(markup.includes('id="guest-display-name" name="name" required minlength="2" maxlength="80"'), "Guest entry should require a bounded display name");
+            assert(markup.includes('id="demo-host-entry"') && markup.includes("Continue as demo host"), "Visitors should be able to start a no-email demo host session");
+            assert(markup.includes("create or manage their own listings") && markup.includes("cannot change Gather’s code, settings, or other accounts"), "Demo host permissions should allow owned listings without site administration");
             assert(markup.includes("no payment is collected") && markup.includes("no host is contacted"), "The disclaimer should clearly state that demo bookings are not real");
             assert(markup.includes('id="show-demo-disclaimer"') && markup.includes("Presentation demo") && markup.includes("Sample stays and prices; bookings are not real."), "A persistent demo notice should remain available after the welcome gate closes");
           });

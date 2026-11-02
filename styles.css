@@ -616,6 +616,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fon
 .guest-entry-form .form-error { margin: 0; color: #a34738; }
 .welcome-primary { width: 100%; min-height: 47px; margin-top: 3px; justify-content: center; }
 .welcome-primary:disabled { opacity: .65; cursor: wait; }
+.demo-tester-entry { margin-top: 10px; }
 .welcome-status { min-height: 20px; margin: 10px 0 0; color: #66776c; font-size: 12px; text-align: center; }
 .welcome-signin { margin: 11px 0 0; color: #66776c; font-size: 13px; text-align: center; }
 .welcome-signin button { border: 0; padding: 0; background: none; color: var(--green-dark); cursor: pointer; font-size: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
