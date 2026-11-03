@@ -794,6 +794,20 @@
   function openBookingModal(offeringId) {
     const offering = state.offerings.find((item) => item.id === offeringId);
     if (!offering) return;
+    const chatPreferences = window.GatherChatBookingPreferences;
+    if (chatPreferences) {
+      if (chatPreferences.dates && Booking.parseDate(chatPreferences.dates.checkin) &&
+          Booking.parseDate(chatPreferences.dates.checkout) && chatPreferences.dates.checkin >= minDate &&
+          chatPreferences.dates.checkout > chatPreferences.dates.checkin) {
+        searchCheckin = chatPreferences.dates.checkin;
+        searchCheckout = chatPreferences.dates.checkout;
+      }
+      if (Number.isInteger(chatPreferences.guests) && chatPreferences.guests >= 1 && chatPreferences.guests <= 20) {
+        searchGuests = chatPreferences.guests;
+      }
+      window.GatherChatBookingPreferences = null;
+      syncSearchForms();
+    }
     if (!currentUser) {
       openAuthModal("signup", "guest", { type: "booking", offeringId });
       return;

@@ -14,7 +14,7 @@ Then visit [http://localhost:4173](http://localhost:4173). Stop the local server
 
 ## Test it
 
-With the local server running, open [http://localhost:4173/tests.html](http://localhost:4173/tests.html). The page runs focused browser-native checks for stay lengths, minimum stays, guest capacity, overlapping reservations, cancellation, booking validation, streamed booking/listing chat actions, EmailJS notifications, and the local Philippines border asset.
+With the local server running, open [http://localhost:4173/tests.html](http://localhost:4173/tests.html). The page runs focused browser-native checks for stay lengths, minimum stays, guest capacity, overlapping reservations, cancellation, booking validation, local assistant recommendations and listing drafts, EmailJS notifications, and the local Philippines border asset.
 
 ## Configure booking email notifications
 
@@ -32,23 +32,11 @@ Gather uses Supabase Auth, a shared Postgres database, and Supabase Storage for 
 
 Row-level security limits profile access to its owner, listings to their host for changes, and reservations to the guest and the listing host. Booking creation, date-conflict checks, cancellation, and listing removal run through restricted database functions. Public users can read only confirmed reservation date ranges needed to show availability; guest contact details are not public. Do not disable RLS or add permissive public policies.
 
-## Configure the live AI booking assistant
+## Gather booking assistant
 
-Gather streams replies from Meta’s open-weight Llama 3.2 3B model using Cloudflare Workers AI, through a Supabase Edge Function. Cloudflare currently includes a limited free daily inference allowance; requests stop when the allowance is exhausted on the free plan rather than automatically becoming billable. Limits and pricing can change. Chat messages and public listing details are sent to Cloudflare for inference. The browser never receives the Cloudflare API token.
+The trip assistant uses Gather’s own lightweight intent and preference logic in `assistant-engine.js`; it does not call an AI provider, require an API key, or send chat messages to an external model. It searches the current public listing and availability data for destinations, stay types, guest capacity, budget, amenities, and explicitly entered ISO dates. It can also guide hosts through providing listing details, then open Gather’s existing editable listing form with those details. Dates and booking details are checked again in the existing booking flow.
 
-1. Create a Cloudflare account, open **Workers AI** in the dashboard, choose **Use REST API**, and create a Workers AI API token. Copy the account ID and token. Cloudflare’s [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) describes the current free daily allowance.
-2. In the Supabase dashboard, open **Edge Functions → Secrets** and add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. Do not add either value to `chat.js`, `supabase-config.js`, or any other browser file.
-3. From this project folder, link the Supabase CLI to the Gather project if needed, then deploy the function:
-
-   ```powershell
-   supabase link --project-ref gcrxsoacrdzyksutwjga
-   supabase functions deploy gather-chat
-   ```
-
-   The function is configured to require a valid Supabase access token. The included CORS allowlist supports Gather’s GitHub Pages site and the local development server at `http://localhost:4173`; add any custom website origin to `supabase/functions/gather-chat/index.ts` before deploying.
-4. Open Gather, sign in or choose demo access, and send a message in the trip assistant. One conversation can help with both booking a stay and preparing a property listing; it infers which task you mean instead of making you choose a mode. For stays, use **Start booking** to open Gather’s date and guest form. For new listings, use **Review listing draft** to open the editable host form; add the required photo and map pin, then review and submit it yourself.
-
-The assistant streams replies and limits each request to ten short chat messages and 450 generated tokens. Cloudflare’s free daily allowance is shared across the account; if it is exhausted, chat resumes after the daily reset. The Llama model is open-weight, but its license is Meta’s Llama Community License, not an unrestricted open-source license.
+This is a purpose-built, rule-based assistant rather than a general-purpose language model: it cannot answer arbitrary questions or interpret every phrasing. Its logic and matching rules are available in this repository, and you can extend them in `assistant-engine.js`.
 
 ## Presentation guest mode
 

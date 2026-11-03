@@ -13,7 +13,7 @@
   </head>
   <body>
     <h1>Stay booking checks</h1>
-    <p>Focused browser-native tests for booking rules, presentation guest access, shared Supabase listings and photo uploads, custom guest counts, EmailJS notifications, and the Philippines map asset.</p>
+    <p>Focused browser-native tests for booking rules, the built-in Gather assistant, presentation guest access, shared listings and photo uploads, EmailJS notifications, and the Philippines map asset.</p>
     <ol id="results"></ol>
     <p id="summary" role="status"></p>
     <script src="booking.js"></script>
@@ -21,6 +21,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="supabase-data.js"></script>
+    <script src="assistant-engine.js"></script>
     <script>
       (function () {
         const api = window.GatherBooking;
@@ -147,26 +148,45 @@
           throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin: "2030-01-05", checkout, guests: 2, name: "Alex Doe", email: "alex@example.com" }, now), "future");
         });
         async function finish() {
-          await testAsync("provides a live conversational booking assistant", async function () {
+          await testAsync("provides a private Gather-specific booking and listing assistant", async function () {
             const response = await fetch("./index.html");
             const markup = await response.text();
             const appScript = await (await fetch("./app.js")).text();
             const styles = await (await fetch("./styles.css")).text();
             const chatScript = await (await fetch("./chat.js")).text();
-            const edgeResponse = await fetch("./supabase/functions/gather-chat/index.ts");
+            const engineResponse = await fetch("./assistant-engine.js");
             assert(markup.includes('id="trip-chat-form"') && markup.includes('id="trip-chat-messages"') && markup.includes("preparing a property listing"), "One assistant should support both booking help and property listing");
-            assert(chatScript.includes("text/event-stream") || chatScript.includes("streamReply") && chatScript.includes("getReader()"), "The assistant should display streamed replies as they arrive");
-            assert(chatScript.includes("functions/v1/gather-chat") && chatScript.includes("dataset.openOffering"), "The assistant should connect to the secure chat function and provide booking actions for recommended stays");
-            assert(edgeResponse.ok, "The Supabase Edge Function should be available");
-            const edgeFunction = await edgeResponse.text();
-            assert(edgeFunction.includes('Deno.env.get("CLOUDFLARE_API_TOKEN")') && edgeFunction.includes('Deno.env.get("CLOUDFLARE_ACCOUNT_ID")') && edgeFunction.includes("api.cloudflare.com/client/v4/accounts/") && edgeFunction.includes("@cf/meta/llama-3.2-3b-instruct") && edgeFunction.includes("stream: true"), "Cloudflare Workers AI should stream the open-weight model from the server using private credentials");
-            assert(edgeFunction.includes("today’s free AI allowance") && edgeFunction.includes("CLOUDFLARE_API_TOKEN") && !edgeFunction.includes("api.openai.com"), "The assistant should explain exhausted free limits and should no longer depend on OpenAI");
-            assert(edgeFunction.includes("do not begin by asking whether they want to book or list") && edgeFunction.includes("[[GATHER_LISTING_DRAFT:"), "The assistant should infer booking versus listing intent and prepare listing drafts in the same chat");
-            assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes('openOfferingForm();'), "A listing draft should open in Gather’s editable listing form");
-            assert(!markup.includes("CLOUDFLARE_API_TOKEN") && !chatScript.includes("CLOUDFLARE_API_TOKEN"), "The Cloudflare API token must never be embedded in browser files");
+            assert(engineResponse.ok && markup.includes('src="assistant-engine.js"'), "The purpose-built assistant engine should be included in the website");
+            assert(chatScript.includes("GatherAssistant.respond") && chatScript.includes("GatherSupabase.loadData(null)"), "The assistant should process messages against Gather’s current public stays");
+            assert(!chatScript.includes("functions/v1/gather-chat") && !chatScript.includes("api.cloudflare.com") && !chatScript.includes("api.openai.com"), "Chat should not depend on a paid AI provider or external inference API");
+            assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes("window.GatherChatBookingPreferences"), "Assistant actions should prefill Gather’s existing booking and editable listing forms");
             assert(styles.includes(".trip-chat {") && styles.includes(".trip-chat-form { grid-template-columns: 1fr; }"), "The assistant should remain usable on mobile-sized screens");
           });
-          await testAsync("renders streamed booking and listing actions from a chat reply", async function () {
+          await testAsync("recommends real stays from destination, budget, and guest preferences", function () {
+            const data = { offerings: api.DEFAULT_OFFERINGS, bookings: [], unavailableDates: [] };
+            const result = window.GatherAssistant.respond("Find a quiet beach stay in Siargao for 4 guests under PHP 7000", data, {});
+            assert(result.stays.length === 1 && result.stays[0].id === "isla-norte", "Should find the Siargao listing within the requested capacity and price");
+            const checkin = api.addDays(api.toDateString(new Date()), 5);
+            const checkout = api.addDays(checkin, 2);
+            const unavailable = { offeringId: "isla-norte", checkin, checkout, status: "confirmed" };
+            const unavailableResult = window.GatherAssistant.respond(`Find Siargao for 4 guests ${checkin} ${checkout}`, { ...data, unavailableDates: [unavailable] }, {});
+            assert(unavailableResult.stays.length === 0 && unavailableResult.reply.includes("couldn’t find"), "Should exclude a real listing when the requested dates conflict with shared availability");
+            const noMatch = window.GatherAssistant.respond("Find a Baguio stay for 8 guests", data, {});
+            assert(noMatch.stays.length === 0 && /fewer guests/.test(noMatch.reply), "Should not recommend stays that cannot accommodate the requested group");
+          });
+          await testAsync("guides a property host through an honest listing draft", function () {
+            const data = { offerings: api.DEFAULT_OFFERINGS, bookings: [], unavailableDates: [] };
+            let result = window.GatherAssistant.respond("I want to list my property", data, {});
+            assert(result.state.listingStep === "name" && result.reply.includes("name"), "Should start by asking for the property name");
+            result = window.GatherAssistant.respond("Amihan test cabin", data, result.state);
+            result = window.GatherAssistant.respond("Baguio", data, result.state);
+            result = window.GatherAssistant.respond("4 guests", data, result.state);
+            result = window.GatherAssistant.respond("₱4,200 per night", data, result.state);
+            result = window.GatherAssistant.respond("A quiet cabin with pine views and a small kitchen.", data, result.state);
+            assert(result.listingDraft && result.listingDraft.name === "Amihan test cabin" && result.listingDraft.location === "Baguio City", "Should prepare the listing with information supplied in the conversation");
+            assert(result.listingDraft.guests === 4 && result.listingDraft.price === 4200 && result.listingDraft.category === "Mountain escapes", "Should capture guest capacity, nightly PHP price, and inferred category");
+          });
+          await testAsync("renders booking and listing actions from the local assistant", async function () {
             const chatScript = await (await fetch("./chat.js")).text();
             const frame = document.createElement("iframe");
             frame.hidden = true;
@@ -177,40 +197,40 @@
                 document.body.appendChild(frame);
               });
               const chatWindow = frame.contentWindow;
+              chatWindow.GatherBooking = api;
+              chatWindow.GatherAssistant = window.GatherAssistant;
               chatWindow.GatherSupabase = {
-                client: { auth: { getSession: async () => ({ data: { session: { access_token: "test-token" } }, error: null }) } },
-                loadData: async () => ({ offerings: [{ id: "stay-1", name: "Siargao Stay", category: "Island stays", location: "Siargao", description: "A sample stay", price: 2500, guests: 4, amenities: [] }] })
+                loadData: async () => ({ offerings: [{ id: "stay-1", name: "Siargao Stay", category: "Island stays", location: "Siargao, Philippines", description: "A sample beach stay", price: 2500, guests: 4, amenities: ["Beach access"] }], bookings: [], unavailableDates: [] })
               };
-              chatWindow.GATHER_SUPABASE_CONFIG = { url: "https://example.supabase.co", publishableKey: "test-key" };
               let listingOpenCount = 0;
               chatWindow.document.querySelector("#add-offering-button").addEventListener("click", () => { listingOpenCount += 1; });
-              const listing = { name: "Island home", category: "Island stays", description: "A comfortable island retreat.", location: "Siargao, Philippines", price: 4200, guests: 5, amenities: ["Wi-Fi"] };
-              const chunks = [
-                `data: ${JSON.stringify({ choices: [{ delta: { content: "I found a stay. [[GATHER_STAY:stay-1]] " } }] })}\n\n`,
-                `data: ${JSON.stringify({ choices: [{ delta: { content: `[[GATHER_LISTING_DRAFT:${JSON.stringify(listing)}]]` } }] })}\n\n`,
-                "data: [DONE]\n\n"
-              ];
-              chatWindow.fetch = async () => new chatWindow.Response(new chatWindow.ReadableStream({
-                start(controller) {
-                  const bytes = new chatWindow.TextEncoder().encode(chunks.join(""));
-                  controller.enqueue(bytes.slice(0, 17));
-                  controller.enqueue(bytes.slice(17));
-                  controller.close();
-                }
-              }), { status: 200, headers: { "content-type": "text/event-stream" } });
               chatWindow.eval(chatScript);
               const input = chatWindow.document.querySelector("#trip-chat-prompt");
-              input.value = "Help me with a stay and listing";
-              chatWindow.document.querySelector("#trip-chat-form").dispatchEvent(new chatWindow.Event("submit", { bubbles: true, cancelable: true }));
-              for (let attempt = 0; attempt < 50 && !chatWindow.document.querySelector(".trip-chat-actions"); attempt += 1) {
-                await new Promise((resolve) => setTimeout(resolve, 10));
-              }
+              const send = async (text) => {
+                input.value = text;
+                chatWindow.document.querySelector("#trip-chat-form").dispatchEvent(new chatWindow.Event("submit", { bubbles: true, cancelable: true }));
+                for (let attempt = 0; attempt < 50 && chatWindow.document.querySelector(".trip-chat-message.assistant:last-child")?.textContent.includes("Checking Gather"); attempt += 1) {
+                  await new Promise((resolve) => setTimeout(resolve, 10));
+                }
+              };
+              await send("Find a beach stay in Siargao");
               const assistant = chatWindow.document.querySelector(".trip-chat-message.assistant");
-              const actions = chatWindow.document.querySelectorAll(".trip-chat-actions button");
-              assert(assistant.textContent.includes("I found a stay.") && !assistant.textContent.includes("[[GATHER_"), "The assistant should parse streamed SSE and hide internal action markers");
-              assert(actions.length === 2 && actions[0].dataset.openOffering === "stay-1", "A supplied stay marker should produce a booking action for that listing");
-              actions[1].click();
-              assert(JSON.stringify(chatWindow.GatherChatListingDraft) === JSON.stringify(listing) && listingOpenCount === 1, "A valid listing draft should open Gather’s listing form with its draft intact");
+              let actions = chatWindow.document.querySelectorAll(".trip-chat-actions button");
+              assert(assistant.textContent.includes("I found a stay") && actions.length === 1 && actions[0].dataset.openOffering === "stay-1", "A matching stay should produce a booking action");
+              actions[0].click();
+              assert(chatWindow.GatherChatBookingPreferences && !chatWindow.GatherChatBookingPreferences.dates, "The booking action should carry any chat preferences into the booking flow");
+              await send("I want to list my property");
+              await send("Island home");
+              await send("Siargao");
+              await send("5 guests");
+              await send("₱4,200 per night");
+              await send("A comfortable island retreat with a kitchen and ocean view.");
+              const listingAction = Array.from(chatWindow.document.querySelectorAll(".trip-chat-actions button")).find((button) => button.textContent.includes("Review listing draft"));
+              assert(listingAction, "Complete listing details should offer a draft review action");
+              listingAction.click();
+              const listing = chatWindow.GatherChatListingDraft;
+              assert(listing && listing.name === "Island home" && listing.location === "Siargao" && listing.guests === 5 && listing.price === 4200, `The assistant should keep the details the host provided: ${JSON.stringify(listing)}`);
+              assert(JSON.stringify(chatWindow.GatherChatListingDraft) === JSON.stringify(listing) && listingOpenCount === 1, "The listing draft action should open Gather’s editable listing form");
               chatWindow.dispatchEvent(new chatWindow.Event("gather-auth-changed"));
               assert(chatWindow.document.querySelectorAll(".trip-chat-message").length === 1, "Changing accounts should clear the prior conversation");
             } finally {
