@@ -88,6 +88,27 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
 .home-view .search-grid { grid-template-columns: 1.65fr 1fr 1fr 1.05fr auto; }
 .home-view .search-field { min-height: 62px; }
 .home-view .search-submit { border-radius: 5px; }
+.trip-chat { max-width: 900px; margin: -22px auto 58px; border: 1px solid #dce7dc; border-radius: 13px; padding: 25px clamp(18px, 4vw, 34px) 20px; background: linear-gradient(120deg, #f8faf5, #eef5ec); box-shadow: 0 7px 23px rgba(39, 72, 53, .05); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.trip-chat-heading { display: flex; align-items: center; gap: 13px; }
+.trip-chat-mark { width: 40px; height: 40px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--green); color: white; font-family: var(--serif); font-size: 28px; font-style: italic; }
+.trip-chat-heading .eyebrow { margin: 0 0 3px; }
+.trip-chat-heading h2 { margin: 0; font-family: var(--serif); font-size: 27px; font-weight: 500; }
+.trip-chat-heading h2 em { color: var(--green); font-weight: 500; }
+.trip-chat-description { margin: 13px 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.trip-chat-messages { display: grid; gap: 10px; max-height: 340px; overflow-y: auto; padding: 15px; border: 1px solid #e1e9e1; border-radius: 9px; background: rgba(255,255,255,.82); }
+.trip-chat-message { width: fit-content; max-width: min(90%, 620px); margin: 0; border-radius: 12px; padding: 10px 13px; color: #40534a; font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.trip-chat-message.assistant { justify-self: start; border: 1px solid #e2eae2; background: #f5f8f4; }
+.trip-chat-message.user { justify-self: end; background: var(--green-dark); color: #fff; }
+.trip-chat-message.error { border-color: #e6c6bd; background: #fff8f5; color: #8d4031; }
+.trip-chat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.trip-chat-actions .button { min-height: 38px; font-size: 12px; }
+.trip-chat-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; margin-top: 12px; }
+.trip-chat-form textarea { width: 100%; min-height: 48px; max-height: 130px; resize: vertical; border: 1px solid #cbd9ce; border-radius: 7px; padding: 12px 14px; background: #fff; color: var(--ink); font-size: 15px; line-height: 1.45; }
+.trip-chat-form textarea:focus-visible { border-color: var(--green); outline: 3px solid rgba(61, 112, 94, .18); outline-offset: 1px; }
+.trip-chat-form .button { min-height: 48px; padding: 0 18px; }
+.trip-chat-form .button:disabled { opacity: .7; cursor: wait; }
+.trip-chat-privacy { margin: 11px 0 0; color: #718076; font-size: 11px; line-height: 1.5; }
 .home-discovery, .home-featured, .how-it-works { padding: 0 0 52px; }
 .home-section-heading, .home-featured > .section-heading { align-items: end; margin-bottom: 19px; }
 .destination-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
@@ -385,6 +406,14 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
 .auth-submit:disabled { opacity: .65; cursor: wait; }
 .auth-switch { margin: 24px 0 0; color: #59685d; text-align: center; font-size: 14px; }
 .auth-switch button { border: 0; padding: 0; background: none; color: var(--green); cursor: pointer; font-size: inherit; font-weight: 700; }
+.auth-demo-access { margin-top: 21px; border: 1px solid #dfe9e1; border-radius: 9px; padding: 17px; background: #f7faf7; }
+.auth-demo-access h3 { margin: 0 0 4px; color: var(--ink); font-family: var(--serif); font-size: 19px; font-weight: 500; }
+.auth-demo-access > p { margin: 0 0 13px; color: #66776c; font-size: 12px; line-height: 1.5; }
+.auth-demo-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.auth-demo-form label { display: flex; min-width: 0; flex-direction: column; gap: 6px; color: #405b4a; font-size: 12px; font-weight: 650; }
+.auth-demo-form input, .auth-demo-form select { width: 100%; min-height: 44px; border: 1px solid #cbd9ce; border-radius: 5px; padding: 9px 10px; background: #fff; color: var(--ink); font-size: 14px; }
+.auth-demo-form .form-error { grid-column: 1 / -1; margin: 0; color: #a34738; }
+.demo-access-submit { grid-column: 1 / -1; width: 100%; min-height: 46px; }
 .auth-local-note { margin: 20px 0 0; border-top: 1px solid #edf0ed; padding-top: 14px; color: #68776e; text-align: center; font-size: 12px; }
 .toast { z-index: 30; position: fixed; right: 22px; bottom: 20px; max-width: calc(100% - 34px); border-radius: 3px; padding: 12px 16px; background: var(--green-dark); box-shadow: 0 8px 28px rgba(32, 41, 31, .19); color: white; font-size: 11px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: .2s ease; }
 .toast.visible { opacity: 1; transform: translateY(0); }
@@ -436,6 +465,11 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
   .home-hero .hero-text { max-width: 350px; margin-top: 12px; font-size: 13px; }
   .home-hero .hero-photo { height: 220px; border-radius: 9px 9px 28px 9px; }
   .home-view > .search-panel { margin-bottom: 36px; }
+  .trip-chat { margin: -12px auto 38px; padding: 20px 15px 16px; }
+  .trip-chat-heading h2 { font-size: 24px; }
+  .trip-chat-messages { max-height: 300px; padding: 11px; }
+  .trip-chat-form { grid-template-columns: 1fr; }
+  .trip-chat-form .button { width: 100%; }
   .search-panel { margin-bottom: 34px; padding: 6px; }
   .search-grid { grid-template-columns: 1fr 1fr; }
   .home-view .search-grid { grid-template-columns: 1fr 1fr; }
@@ -542,6 +576,8 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
   .auth-form label { font-size: 13px; }
   .auth-form input, .auth-form select { min-height: 50px; font-size: 16px; }
   .auth-switch { margin-top: 20px; font-size: 13px; }
+  .auth-demo-form { grid-template-columns: 1fr; gap: 10px; }
+  .auth-demo-form .form-error, .demo-access-submit { grid-column: auto; }
   .signed-in-details > small { max-width: 78px; text-align: right; }
   .confirm-row { align-items: stretch; flex-direction: column; }
   .confirm-row .button { width: 100%; }
@@ -622,16 +658,11 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fon
 .demo-disclosure > strong { color: var(--green-dark); font-size: 14px; }
 .demo-disclosure ul { display: grid; gap: 8px; margin: 10px 0 0; padding-left: 19px; color: #53665b; font-size: 13px; line-height: 1.5; }
 .demo-disclosure li::marker { color: #b0835f; }
-.guest-entry-form { display: grid; gap: 8px; margin-top: 18px; }
-.guest-entry-form label { color: #53665b; font-size: 13px; font-weight: 700; }
-.guest-entry-form input { width: 100%; min-height: 46px; border: 1px solid #d7e1d9; border-radius: 5px; padding: 10px 12px; background: #fff; color: var(--ink); font-size: 16px; }
-.guest-entry-form .form-error { margin: 0; color: #a34738; }
 .welcome-primary { width: 100%; min-height: 47px; margin-top: 3px; justify-content: center; }
 .welcome-primary:disabled { opacity: .65; cursor: wait; }
-.demo-tester-entry { margin-top: 10px; }
+.welcome-switch-account { display: block; margin: 11px auto 0; padding: 5px 8px; border: 0; background: transparent; color: var(--green-dark); font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.welcome-switch-account:disabled { opacity: .65; cursor: wait; }
 .welcome-status { min-height: 20px; margin: 10px 0 0; color: #66776c; font-size: 12px; text-align: center; }
-.welcome-signin { margin: 11px 0 0; color: #66776c; font-size: 13px; text-align: center; }
-.welcome-signin button { border: 0; padding: 0; background: none; color: var(--green-dark); cursor: pointer; font-size: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 680px) {
   .welcome-backdrop { align-items: flex-start; padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom)); }

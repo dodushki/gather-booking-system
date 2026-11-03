@@ -147,6 +147,75 @@
           throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin: "2030-01-05", checkout, guests: 2, name: "Alex Doe", email: "alex@example.com" }, now), "future");
         });
         async function finish() {
+          await testAsync("provides a live conversational booking assistant", async function () {
+            const response = await fetch("./index.html");
+            const markup = await response.text();
+            const appScript = await (await fetch("./app.js")).text();
+            const styles = await (await fetch("./styles.css")).text();
+            const chatScript = await (await fetch("./chat.js")).text();
+            const edgeResponse = await fetch("./supabase/functions/gather-chat/index.ts");
+            assert(markup.includes('id="trip-chat-form"') && markup.includes('id="trip-chat-messages"') && markup.includes("preparing a property listing"), "One assistant should support both booking help and property listing");
+            assert(chatScript.includes("text/event-stream") || chatScript.includes("streamReply") && chatScript.includes("getReader()"), "The assistant should display streamed replies as they arrive");
+            assert(chatScript.includes("functions/v1/gather-chat") && chatScript.includes("dataset.openOffering"), "The assistant should connect to the secure chat function and provide booking actions for recommended stays");
+            assert(edgeResponse.ok, "The Supabase Edge Function should be available");
+            const edgeFunction = await edgeResponse.text();
+            assert(edgeFunction.includes('Deno.env.get("OPENAI_API_KEY")') && edgeFunction.includes("api.openai.com/v1/chat/completions") && edgeFunction.includes("stream: true"), "OpenAI should be called from the server with a secret key and streaming enabled");
+            assert(edgeFunction.includes("do not begin by asking whether they want to book or list") && edgeFunction.includes("[[GATHER_LISTING_DRAFT:"), "The assistant should infer booking versus listing intent and prepare listing drafts in the same chat");
+            assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes('openOfferingForm();'), "A listing draft should open in Gather’s editable listing form");
+            assert(!markup.includes("OPENAI_API_KEY") && !chatScript.includes("OPENAI_API_KEY"), "The OpenAI API key must never be embedded in browser files");
+            assert(styles.includes(".trip-chat {") && styles.includes(".trip-chat-form { grid-template-columns: 1fr; }"), "The assistant should remain usable on mobile-sized screens");
+          });
+          await testAsync("renders streamed booking and listing actions from a chat reply", async function () {
+            const chatScript = await (await fetch("./chat.js")).text();
+            const frame = document.createElement("iframe");
+            frame.hidden = true;
+            frame.srcdoc = '<form id="trip-chat-form"><input id="trip-chat-prompt"><button type="submit">Send</button></form><div id="trip-chat-messages"></div><button id="add-offering-button">Add listing</button>';
+            try {
+              await new Promise((resolve) => {
+                frame.onload = resolve;
+                document.body.appendChild(frame);
+              });
+              const chatWindow = frame.contentWindow;
+              chatWindow.GatherSupabase = {
+                client: { auth: { getSession: async () => ({ data: { session: { access_token: "test-token" } }, error: null }) } },
+                loadData: async () => ({ offerings: [{ id: "stay-1", name: "Siargao Stay", category: "Island stays", location: "Siargao", description: "A sample stay", price: 2500, guests: 4, amenities: [] }] })
+              };
+              chatWindow.GATHER_SUPABASE_CONFIG = { url: "https://example.supabase.co", publishableKey: "test-key" };
+              let listingOpenCount = 0;
+              chatWindow.document.querySelector("#add-offering-button").addEventListener("click", () => { listingOpenCount += 1; });
+              const listing = { name: "Island home", category: "Island stays", description: "A comfortable island retreat.", location: "Siargao, Philippines", price: 4200, guests: 5, amenities: ["Wi-Fi"] };
+              const chunks = [
+                `data: ${JSON.stringify({ choices: [{ delta: { content: "I found a stay. [[GATHER_STAY:stay-1]] " } }] })}\n\n`,
+                `data: ${JSON.stringify({ choices: [{ delta: { content: `[[GATHER_LISTING_DRAFT:${JSON.stringify(listing)}]]` } }] })}\n\n`,
+                "data: [DONE]\n\n"
+              ];
+              chatWindow.fetch = async () => new chatWindow.Response(new chatWindow.ReadableStream({
+                start(controller) {
+                  const bytes = new chatWindow.TextEncoder().encode(chunks.join(""));
+                  controller.enqueue(bytes.slice(0, 17));
+                  controller.enqueue(bytes.slice(17));
+                  controller.close();
+                }
+              }), { status: 200, headers: { "content-type": "text/event-stream" } });
+              chatWindow.eval(chatScript);
+              const input = chatWindow.document.querySelector("#trip-chat-prompt");
+              input.value = "Help me with a stay and listing";
+              chatWindow.document.querySelector("#trip-chat-form").dispatchEvent(new chatWindow.Event("submit", { bubbles: true, cancelable: true }));
+              for (let attempt = 0; attempt < 50 && !chatWindow.document.querySelector(".trip-chat-actions"); attempt += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 10));
+              }
+              const assistant = chatWindow.document.querySelector(".trip-chat-message.assistant");
+              const actions = chatWindow.document.querySelectorAll(".trip-chat-actions button");
+              assert(assistant.textContent.includes("I found a stay.") && !assistant.textContent.includes("[[GATHER_"), "The assistant should parse streamed SSE and hide internal action markers");
+              assert(actions.length === 2 && actions[0].dataset.openOffering === "stay-1", "A supplied stay marker should produce a booking action for that listing");
+              actions[1].click();
+              assert(JSON.stringify(chatWindow.GatherChatListingDraft) === JSON.stringify(listing) && listingOpenCount === 1, "A valid listing draft should open Gather’s listing form with its draft intact");
+              chatWindow.dispatchEvent(new chatWindow.Event("gather-auth-changed"));
+              assert(chatWindow.document.querySelectorAll(".trip-chat-message").length === 1, "Changing accounts should clear the prior conversation");
+            } finally {
+              frame.remove();
+            }
+          });
           await testAsync("serves all starter destination photos locally", async function () {
             const responses = await Promise.all(api.DEFAULT_OFFERINGS.map((offering) => fetch(offering.image)));
             assert(responses.every((response) => response.ok && response.headers.get("content-type").startsWith("image/jpeg")), "Every starter photo should load as a local JPEG");
@@ -193,20 +262,23 @@
               client.from = originalFrom;
             }
           });
-          await testAsync("shows the demo disclaimer and required guest name before app access", async function () {
+          await testAsync("shows a clear demo disclosure before sign-in and unified guest or host access", async function () {
             const response = await fetch("./index.html");
             assert(response.ok, "The app page should be available");
             const markup = await response.text();
             assert(markup.includes('id="welcome-gate"') && markup.includes('aria-modal="true"'), "The welcome disclaimer should be a modal gate");
+            assert(markup.includes('id="welcome-switch-account"'), "Signed-in visitors should be offered a sign-out and account-switch option from the welcome gate");
             assert(markup.includes('id="app-shell" inert aria-hidden="true"'), "The app should be inaccessible until the guest acknowledges the gate");
-            assert(markup.includes('id="guest-display-name" name="name" required minlength="2" maxlength="80"'), "Guest entry should require a bounded display name");
-            assert(markup.includes('id="demo-host-entry"') && markup.includes("Continue as demo host"), "Visitors should be able to start a no-email demo host session");
-            assert(markup.includes("create or manage their own listings") && markup.includes("cannot change Gather’s code, settings, or other accounts"), "Demo host permissions should allow owned listings without site administration");
-            assert(markup.includes("no payment is collected") && markup.includes("no host is contacted"), "The disclaimer should clearly state that demo bookings are not real");
+            assert(markup.indexOf('id="welcome-gate"') < markup.indexOf('id="booking-modal"'), "The disclosure should appear before the sign-in dialog in the experience");
+            assert(markup.includes("Property details, prices, ratings, and availability are examples, not live offers."), "The disclosure should read clearly and distinguish demo content from live offers");
+            assert(markup.includes("Bookings are demo records only. They do not reserve accommodation, contact a host, or process payment."), "The disclosure should clearly describe booking limitations");
+            assert(!markup.includes("Continue as a guest") && !markup.includes("Continue as demo host"), "Separate guest and host continue buttons should be removed");
             assert(markup.includes('id="show-demo-disclaimer"') && markup.includes("Presentation demo") && markup.includes("Sample stays and prices; bookings are not real."), "A persistent demo notice should remain available after the welcome gate closes");
             const appScript = await (await fetch("./app.js")).text();
             const styles = await (await fetch("./styles.css")).text();
             assert(appScript.includes('classList.add("auth-modal")') && appScript.includes('[name="email"]'), "The auth dialog should be separately marked and focus its first field");
+            assert(appScript.includes('id="demo-access-form"') && appScript.includes('name="role"><option value="guest"${role === "guest"') && appScript.includes('<option value="host"${role === "host"'), "One demo-access form should let visitors choose guest or host");
+            assert(appScript.includes("Continue to sign in") && appScript.includes("Continue as demo"), "The disclosure should lead to sign-in, which offers one combined demo-access action");
             assert(styles.includes(".modal.auth-modal { width: min(100%, 640px)") && styles.includes(".auth-form input, .auth-form select { width: 100%; min-height: 52px") && styles.includes(".modal-backdrop.auth-backdrop"), "Sign-in should have a larger panel and accessible controls without resizing the guest welcome gate");
           });
           await testAsync("loads shared Philippine stays and public availability from Supabase", async function () {

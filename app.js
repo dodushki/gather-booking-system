@@ -118,31 +118,23 @@
   }
 
   function updateWelcomeGate() {
-    const guestForm = $("#guest-entry-form");
     const continueButton = $("#welcome-continue-session");
-    const submitButton = $("#guest-entry-submit");
-    const demoHostButton = $("#demo-host-entry");
     const hasSession = Boolean(currentUser);
-    guestForm.classList.toggle("hidden", hasSession);
-    continueButton.classList.toggle("hidden", !hasSession);
-    demoHostButton.classList.toggle("hidden", hasSession);
-    $(".welcome-signin").classList.toggle("hidden", hasSession);
-    if (hasSession) {
-      continueButton.innerHTML = `Continue as ${escapeHtml(currentUser.name)} <span aria-hidden="true">→</span>`;
-    }
-    submitButton.disabled = isInitializing || Boolean(sharedServiceError);
-    demoHostButton.disabled = isInitializing || Boolean(sharedServiceError);
+    const switchAccountButton = $("#welcome-switch-account");
+    continueButton.classList.remove("hidden");
+    continueButton.disabled = isInitializing;
+    switchAccountButton.classList.toggle("hidden", !hasSession);
+    switchAccountButton.disabled = isInitializing;
+    continueButton.innerHTML = hasSession
+      ? `Continue as ${escapeHtml(currentUser.name)} <span aria-hidden="true">→</span>`
+      : 'Continue to sign in <span aria-hidden="true">→</span>';
     $("#welcome-status").textContent = isInitializing
-      ? "Connecting to Gather’s shared demo…"
+      ? "Connecting to Gather…"
       : sharedServiceError
-        ? `The shared demo is unavailable right now: ${sharedServiceError}`
+        ? `Gather is temporarily unavailable: ${sharedServiceError}`
         : hasSession
-          ? currentUser.isAnonymous && currentUser.role === "host"
-            ? "Your demo host session is ready on this browser."
-            : currentUser.isAnonymous
-            ? "Your guest session is ready on this browser."
-            : "Your account is ready."
-          : "Your name will be saved with your demo bookings.";
+          ? `Welcome back, ${currentUser.name}.`
+          : "Sign in or continue with a demo guest or host account.";
   }
 
   function showWelcomeGate() {
@@ -153,7 +145,7 @@
     document.body.classList.add("welcome-gate-open");
     window.requestAnimationFrame(() => {
       if (elements.welcomeGate.classList.contains("hidden")) return;
-      (currentUser ? $("#welcome-continue-session") : $("#guest-display-name")).focus();
+      $("#welcome-continue-session").focus();
     });
   }
 
@@ -170,39 +162,58 @@
     document.body.classList.remove("welcome-gate-open");
   }
 
-  function openWelcomeSignIn() {
-    elements.welcomeGate.classList.add("hidden");
-    document.body.classList.remove("welcome-gate-open");
-    openAuthModal("signin", "guest", null);
+  function continueFromWelcome() {
+    if (!currentUser) {
+      dismissWelcomeGate();
+      openAuthModal("signin", "guest", null);
+      return;
+    }
+    dismissWelcomeGate();
+    navigate(currentUser.role === "host" ? "manage" : "home", false);
+    showToast(`Welcome back, ${currentUser.name.split(/\s+/)[0]}.`);
   }
 
-  async function submitGuestEntry(event) {
-    event.preventDefault();
-    await startGuestSession(new FormData(event.currentTarget).get("name"), $("#guest-entry-submit"));
-  }
-
-  async function startGuestSession(nameInput, button, role) {
-    const error = $("#guest-entry-error");
+  async function switchAccountFromWelcome() {
+    if (!currentUser) {
+      dismissWelcomeGate();
+      openAuthModal("signin", "guest", null);
+      return;
+    }
     try {
+      if (!await confirmAndEndSession()) return;
+      dismissWelcomeGate();
+      openAuthModal("signin", "guest", null);
+    } catch (error) {
+      console.error("Could not switch Gather accounts.", error);
+      showToast(`Could not sign out: ${error.message}`);
+    }
+  }
+
+  async function startGuestSession(nameInput, role, button, error) {
+    try {
+      if (authIntent && authIntent.type === "manage" && role !== "host") {
+        throw new Error("Choose the demo host option to create or manage property listings.");
+      }
       const name = Booking.validateGuestName(nameInput);
       error.classList.add("hidden");
       button.disabled = true;
-      button.textContent = role === "host" ? "Starting your demo host session…" : "Starting your guest session…";
+      button.textContent = "Starting your demo session…";
       const account = await GatherData.signInAnonymously(name, role);
       await startSession(account);
-      dismissWelcomeGate();
-      navigate("home", false);
+      welcomeGateRequired = false;
+      authIntent = null;
+      closeModal();
+      navigate(role === "host" ? "manage" : "home", false);
+      if (role === "host") openOfferingForm();
       showToast(`Welcome, ${account.name.split(/\s+/)[0]}. Your demo ${role === "host" ? "host" : "guest"} session is ready.`);
     } catch (caught) {
       const message = /anonymous.*disabled|disabled.*anonymous/i.test(caught.message)
-        ? "Guest access is not enabled yet. In Supabase, open Authentication → Sign In / Providers and enable Anonymous Sign-Ins."
+        ? "Demo access is not enabled yet. In Supabase, open Authentication → Sign In / Providers and enable Anonymous Sign-Ins."
         : caught.message;
       error.textContent = message;
       error.classList.remove("hidden");
-      button.disabled = Boolean(sharedServiceError);
-      button.innerHTML = button.id === "demo-host-entry"
-        ? 'Continue as demo host <span aria-hidden="true">→</span>'
-        : 'Continue as a guest <span aria-hidden="true">→</span>';
+      button.disabled = false;
+      button.innerHTML = 'Continue as demo <span aria-hidden="true">→</span>';
     }
   }
 
@@ -301,6 +312,26 @@
     showWelcomeGate();
   }
 
+  function signOutConfirmation() {
+    if (!currentUser) return null;
+    return {
+      title: currentUser.isAnonymous ? "End this demo session?" : "Sign out of Gather?",
+      message: currentUser.isAnonymous
+        ? currentUser.role === "host"
+          ? "This browser will lose access to your demo host session. Your listings and demo bookings will remain in shared Gather data, but you will no longer be able to manage those listings or view or cancel your bookings."
+          : "This browser will lose access to your guest trip list. Any demo bookings you made will remain in shared availability, but you will no longer be able to view or cancel them."
+        : "You’ll be signed out on this device. Your account, listings, and bookings will remain saved.",
+      confirmLabel: "Sign out"
+    };
+  }
+
+  async function confirmAndEndSession() {
+    const confirmation = signOutConfirmation();
+    if (!confirmation || !await requestConfirmation(confirmation)) return false;
+    await endSession();
+    return true;
+  }
+
   function renderAccountButton() {
     const button = $("#account-button");
     if (!currentUser) {
@@ -335,11 +366,33 @@
         <button class="button button-dark auth-submit" type="submit">${isSignup ? "Create my account" : "Sign in"} <span aria-hidden="true">→</span></button>
       </form>
       <p class="auth-switch">${isSignup ? "Already have an account?" : "New to Gather?"} <button type="button" data-auth-mode="${isSignup ? "signin" : "signup"}" data-auth-role="${role}">${isSignup ? "Sign in" : "Create an account"}</button></p>
+      ${!isSignup ? `<section class="auth-demo-access" aria-labelledby="demo-access-title">
+        <h3 id="demo-access-title">Prefer to explore first?</h3>
+        <p>Try Gather without creating an email account. Choose how you’d like to use the demo.</p>
+        <form id="demo-access-form" class="auth-demo-form">
+          <label>Your name<input name="name" required minlength="2" maxlength="80" autocomplete="name" placeholder="Enter your name"></label>
+          <label>Use Gather as<select name="role"><option value="guest"${role === "guest" ? " selected" : ""}>Guest — find and book stays</option><option value="host"${role === "host" ? " selected" : ""}>Host — create and manage listings</option></select></label>
+          <p class="form-error hidden" id="demo-access-error" role="alert"></p>
+          <button class="button button-outline demo-access-submit" type="submit">Continue as demo <span aria-hidden="true">→</span></button>
+        </form>
+      </section>` : ""}
       <p class="auth-local-note">Gather accounts are securely managed and shared across your devices.</p>`;
     elements.modal.classList.remove("hidden");
     elements.modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     $("#auth-form").addEventListener("submit", submitAuth);
+    const demoAccessForm = $("#demo-access-form");
+    if (demoAccessForm) {
+      demoAccessForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await startGuestSession(
+          new FormData(demoAccessForm).get("name"),
+          new FormData(demoAccessForm).get("role"),
+          $(".demo-access-submit", demoAccessForm),
+          $("#demo-access-error", demoAccessForm)
+        );
+      });
+    }
     $('[name="email"]', $("#auth-form")).focus();
   }
 
@@ -389,7 +442,10 @@
       closeModal();
       showToast(`Welcome${isSignup ? " to Gather" : " back"}, ${account.name.split(/\s+/)[0]}.`);
       if (intent && intent.type === "booking") openBookingModal(intent.offeringId);
-      else if (intent && intent.type === "manage") navigate("manage");
+      else if (intent && intent.type === "manage") {
+        navigate("manage");
+        openOfferingForm();
+      }
       else if (intent && intent.type === "bookings") navigate("bookings");
       else if (account.role === "host") navigate("manage");
       else navigate("home");
@@ -904,13 +960,15 @@
 
   function openOfferingForm(offering) {
     if (!currentUser || currentUser.role !== "host") {
-      openAuthModal("signup", "host", { type: "manage" });
+      openAuthModal("signin", "host", { type: "manage" });
       return;
     }
     $(".modal", elements.modal).classList.remove("auth-modal");
     elements.modal.classList.remove("auth-backdrop");
     editingOfferingId = offering ? offering.id : null;
-    const value = offering || { name: "", category: "Island stays", description: "", location: "", price: 5000, rating: 4.6, reviews: 0, guests: 2, bedrooms: 1, bathrooms: 1, icon: "⌂", image: "photo-1510414842594-a61c69b5ae57", badge: "A favorite", amenities: [], days: [0, 1, 2, 3, 4, 5, 6], minimumNights: 1 };
+    const chatDraft = window.GatherChatListingDraft;
+    const value = offering || { name: "", category: "Island stays", description: "", location: "", price: 5000, rating: 4.6, reviews: 0, guests: 2, bedrooms: 1, bathrooms: 1, icon: "⌂", image: "photo-1510414842594-a61c69b5ae57", badge: "A favorite", amenities: [], days: [0, 1, 2, 3, 4, 5, 6], minimumNights: 1, ...(chatDraft || {}) };
+    if (chatDraft) window.GatherChatListingDraft = null;
     elements.modalContent.innerHTML = `<div class="modal-heading form-modal-heading"><span class="modal-kicker">GATHER HOSTS · ${offering ? "YOUR LISTING" : "A NEW PLACE"}</span><h2 id="modal-title">${offering ? "A little" : "Put your place"} <em>${offering ? "update." : "on the map."}</em></h2><p>Share the details guests need to find their way to you.</p></div>
     <form class="offering-form" id="offering-form"><div class="form-grid"><label>Place name<input name="name" required maxlength="80" value="${escapeHtml(value.name)}" placeholder="e.g. A Little House in the Islands"></label><label>Stay type<select name="category">${["Island stays", "Beachfront stays", "Mountain escapes", "City hotels", "Serviced apartments", "Heritage inns", "Farm stays", "City hideaways", "Nature retreats", "Other"].map((item) => `<option${item === value.category ? " selected" : ""}>${item}</option>`).join("")}</select></label></div>
       <label>Description<textarea name="description" rows="2" required maxlength="240" placeholder="What makes it feel like yours?">${escapeHtml(value.description)}</textarea></label>
@@ -1119,16 +1177,9 @@
       customGuestCount.required = isCustom;
       if (isCustom && !customGuestCount.value) customGuestCount.value = "9";
     });
-    $("#guest-entry-form").addEventListener("submit", submitGuestEntry);
-    $("#demo-host-entry").addEventListener("click", () => startGuestSession("Gather Demo Host", $("#demo-host-entry"), "host"));
-    $("#welcome-signin").addEventListener("click", openWelcomeSignIn);
     $("#show-demo-disclaimer").addEventListener("click", showDemoDisclaimer);
-    $("#welcome-continue-session").addEventListener("click", () => {
-      if (!currentUser) return;
-      dismissWelcomeGate();
-      navigate(currentUser.role === "host" ? "manage" : "home", false);
-      showToast(`Welcome back, ${currentUser.name.split(/\s+/)[0]}.`);
-    });
+    $("#welcome-continue-session").addEventListener("click", continueFromWelcome);
+    $("#welcome-switch-account").addEventListener("click", switchAccountFromWelcome);
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       updateSearchDates(form);
@@ -1226,17 +1277,7 @@
     if (accountAction) {
       const action = accountAction.dataset.accountAction;
       if (action === "signout") {
-        const confirmed = await requestConfirmation({
-          title: currentUser.isAnonymous ? "End this demo session?" : "Sign out of Gather?",
-          message: currentUser.isAnonymous
-            ? currentUser.role === "host"
-              ? "This browser will lose access to your demo host session. Your listings and demo bookings will remain in shared Gather data, but you will no longer be able to manage those listings or view or cancel your bookings."
-              : "This browser will lose access to your guest trip list. Any demo bookings you made will remain in shared availability, but you will no longer be able to view or cancel them."
-            : "You’ll be signed out on this device. Your account, listings, and bookings will remain saved.",
-          confirmLabel: "Sign out"
-        });
-        if (!confirmed) return;
-        try { await endSession(); }
+        try { await confirmAndEndSession(); }
         catch (error) {
           console.error("Could not sign out of Gather.", error);
           showToast(`Could not sign out: ${error.message}`);
@@ -1339,6 +1380,7 @@
   });
   GatherData.onAuthStateChange((account) => {
     currentUser = account;
+    window.dispatchEvent(new CustomEvent("gather-auth-changed"));
     renderAccountButton();
     updateWelcomeGate();
     refreshSharedData().catch((error) => {

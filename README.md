@@ -14,7 +14,7 @@ Then visit [http://localhost:4173](http://localhost:4173). Stop the local server
 
 ## Test it
 
-With the local server running, open [http://localhost:4173/tests.html](http://localhost:4173/tests.html). The page runs focused browser-native checks for stay lengths, minimum stays, guest capacity, overlapping reservations, cancellation, booking validation, EmailJS notifications, and the local Philippines border asset.
+With the local server running, open [http://localhost:4173/tests.html](http://localhost:4173/tests.html). The page runs focused browser-native checks for stay lengths, minimum stays, guest capacity, overlapping reservations, cancellation, booking validation, streamed booking/listing chat actions, EmailJS notifications, and the local Philippines border asset.
 
 ## Configure booking email notifications
 
@@ -32,9 +32,27 @@ Gather uses Supabase Auth, a shared Postgres database, and Supabase Storage for 
 
 Row-level security limits profile access to its owner, listings to their host for changes, and reservations to the guest and the listing host. Booking creation, date-conflict checks, cancellation, and listing removal run through restricted database functions. Public users can read only confirmed reservation date ranges needed to show availability; guest contact details are not public. Do not disable RLS or add permissive public policies.
 
+## Configure the live AI booking assistant
+
+Gather streams conversational replies from OpenAI through a Supabase Edge Function. The browser sends the signed-in user’s access token and public listing details; the OpenAI API key stays in Supabase and is never placed in the website.
+
+1. Create an OpenAI API key and configure an OpenAI usage limit for the project. Chat messages are sent to OpenAI to generate answers.
+2. In the Supabase dashboard, add `OPENAI_API_KEY` under **Edge Functions → Secrets**. Do not add the key to `chat.js`, `supabase-config.js`, or any other browser file.
+3. From this project folder, link the Supabase CLI to the Gather project if needed, then deploy the function:
+
+   ```powershell
+   supabase link --project-ref gcrxsoacrdzyksutwjga
+   supabase functions deploy gather-chat
+   ```
+
+   The function is configured to require a valid Supabase access token. The included CORS allowlist supports Gather’s GitHub Pages site and the local development server at `http://localhost:4173`; add any custom website origin to `supabase/functions/gather-chat/index.ts` before deploying.
+4. Open Gather, sign in or choose demo access, and send a message in the trip assistant. One conversation can help with both booking a stay and preparing a property listing; it infers which task you mean instead of making you choose a mode. For stays, use **Start booking** to open Gather’s date and guest form. For new listings, use **Review listing draft** to open the editable host form; add the required photo and map pin, then review and submit it yourself.
+
+The assistant uses `gpt-4o-mini`, streams replies, and limits each request to ten short chat messages and 450 generated tokens. OpenAI usage may incur charges; set a spending limit in your OpenAI account before enabling it.
+
 ## Presentation guest mode
 
-The welcome screen explains that Gather is a student presentation demo. Visitors can enter a name to continue as a guest, or start the built-in **Gather Demo Host**, without an email address, password, or signup. The demo host uses Supabase anonymous authentication with the host role: they can browse, save favorites, book stays, and create or manage their own listings, but have no site-administration, settings, or code access. Hosts can see guest names on reservations for their own listings. Guest bookings update shared availability but do not contact a host, send an email, arrange a real stay, or collect payment. Anonymous sessions remain on the browser where they were created; after signing out, the user can no longer access their trips or manage their listings. Enable Anonymous Sign-Ins in the Supabase dashboard before presenting.
+The welcome screen first explains that Gather is a presentation demo, then opens sign-in. From the sign-in dialog, visitors can choose a display name and continue as a demo guest or host without an email address or password. When a session is active, the welcome screen also offers **Sign out or use a different account**; after confirmation it signs out and opens sign-in. Demo hosts use Supabase anonymous authentication with the host role: they can browse, save favorites, book stays, and create or manage their own listings, but have no site-administration, settings, or code access. Hosts can see guest names on reservations for their own listings. Guest bookings update shared availability but do not contact a host, send an email, arrange a real stay, or collect payment. Anonymous sessions remain on the browser where they were created; after signing out, the user can no longer access their trips or manage their listings. Enable Anonymous Sign-Ins in the Supabase dashboard before presenting.
 
 ## Data and scope
 

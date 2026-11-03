@@ -55,6 +55,23 @@
             </form>
           </section>
 
+          <section class="trip-chat" aria-labelledby="trip-chat-title">
+            <div class="trip-chat-heading">
+              <span class="trip-chat-mark" aria-hidden="true">g</span>
+              <div><p class="eyebrow">GATHER TRIP ASSISTANT</p><h2 id="trip-chat-title">Where would you like to <em>go?</em></h2></div>
+            </div>
+            <p class="trip-chat-description">Get help finding and booking a stay, or preparing a property listing—all in one conversation.</p>
+            <div class="trip-chat-messages" id="trip-chat-messages" role="log" aria-live="polite" aria-relevant="additions text">
+              <div class="trip-chat-message assistant">Hi! I can help you plan a stay or prepare a property listing. Tell me what you have in mind, and we’ll take it one step at a time.</div>
+            </div>
+            <form id="trip-chat-form" class="trip-chat-form">
+              <label class="sr-only" for="trip-chat-prompt">Message the Gather trip assistant</label>
+              <textarea id="trip-chat-prompt" name="prompt" rows="2" maxlength="800" required placeholder="Try: I want a quiet beach trip with great food…"></textarea>
+              <button class="button button-dark" type="submit">Send <span aria-hidden="true">→</span></button>
+            </form>
+            <p class="trip-chat-privacy">Chat messages and public listing details are sent to OpenAI; answers may be inaccurate. Listings and bookings are for demonstration only. Never share passwords or payment details.</p>
+          </section>
+
           <section class="home-discovery" aria-labelledby="destinations-title">
             <div class="section-heading home-section-heading">
               <div><p class="eyebrow">A GOOD PLACE TO BEGIN</p><h2 id="destinations-title">Where will you <em>unwind?</em></h2></div>
@@ -137,28 +154,21 @@
     <div class="welcome-backdrop" id="welcome-gate">
       <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-disclaimer">
         <span class="welcome-mark" aria-hidden="true">g</span>
-        <p class="eyebrow">GATHER · PRESENTATION DEMO</p>
-        <h1 id="welcome-title">A good trip starts with knowing what’s real.</h1>
-        <p class="welcome-intro" id="welcome-disclaimer">Gather is a student-built demo inspired by booking experiences, with sample stays across the Philippines.</p>
+        <p class="eyebrow">WELCOME TO GATHER</p>
+        <h1 id="welcome-title">Find a stay worth looking forward to.</h1>
+        <p class="welcome-intro" id="welcome-disclaimer">Explore places to stay across the Philippines and try the Gather booking experience.</p>
         <div class="demo-disclosure">
-          <strong>Before you explore</strong>
+          <strong>About this presentation</strong>
           <ul>
-            <li>Listings, nightly prices, and ratings are examples—not live offers.</li>
-            <li>Destination photos show real Philippine places and may not depict the sample stay itself.</li>
-            <li>Bookings made here are shared demo records only. They can temporarily block dates for other presenters, but no host is contacted, no stay is arranged, and no payment is collected.</li>
-            <li>The demo host can browse and book stays, save favorites, and create or manage their own listings. This is not a site administrator account: it cannot change Gather’s code, settings, or other accounts. No email or password is needed; the anonymous session stays on this browser.</li>
+            <li>Property details, prices, ratings, and availability are examples, not live offers.</li>
+            <li>Bookings are demo records only. They do not reserve accommodation, contact a host, or process payment.</li>
+            <li>Destination photography may not show the listed property.</li>
+            <li>Demo hosts can create and manage listings. Demo access is not site administration; no email or password is required.</li>
           </ul>
         </div>
-        <form class="guest-entry-form" id="guest-entry-form">
-          <label for="guest-display-name">What should we call you?</label>
-          <input id="guest-display-name" name="name" required minlength="2" maxlength="80" autocomplete="name" placeholder="Enter your name">
-          <p class="form-error hidden" id="guest-entry-error" role="alert"></p>
-          <button class="button button-dark welcome-primary" id="guest-entry-submit" type="submit">Continue as a guest <span aria-hidden="true">→</span></button>
-        </form>
-        <button class="button button-outline welcome-primary demo-host-entry" id="demo-host-entry" type="button">Continue as demo host <span aria-hidden="true">→</span></button>
         <button class="button button-dark welcome-primary hidden" id="welcome-continue-session" type="button"></button>
-        <p class="welcome-status" id="welcome-status" role="status">Connecting to Gather’s shared demo…</p>
-        <p class="welcome-signin">Already have a Gather account? <button type="button" id="welcome-signin">Sign in</button></p>
+        <button class="welcome-switch-account hidden" id="welcome-switch-account" type="button">Sign out or use a different account</button>
+        <p class="welcome-status" id="welcome-status" role="status">Connecting to Gather…</p>
       </section>
     </div>
     <div class="modal-backdrop hidden" id="booking-modal" aria-hidden="true"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button type="button" class="modal-close" data-close-modal aria-label="Close dialog">×</button><div id="modal-content"></div></section></div>
@@ -172,5 +182,6 @@
     <script src="supabase-config.js"></script>
     <script src="supabase-data.js"></script>
     <script src="app.js"></script>
+    <script src="chat.js"></script>
   </body>
 </html>
