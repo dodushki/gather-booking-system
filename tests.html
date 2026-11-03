@@ -278,6 +278,7 @@
             const appScript = await (await fetch("./app.js")).text();
             const styles = await (await fetch("./styles.css")).text();
             assert(appScript.includes('classList.add("auth-modal")') && appScript.includes('[name="email"]'), "The auth dialog should be separately marked and focus its first field");
+            assert(styles.includes(".confirmation-backdrop { z-index: 60") && styles.includes(".welcome-backdrop { z-index: 50"), "Confirmation dialogs should stack above the welcome gate so sign-out can be confirmed");
             assert(appScript.includes('id="demo-access-form"') && appScript.includes('name="role"><option value="guest"${role === "guest"') && appScript.includes('<option value="host"${role === "host"'), "One demo-access form should let visitors choose guest or host");
             assert(appScript.includes("Continue to sign in") && appScript.includes("Continue as demo"), "The disclosure should lead to sign-in, which offers one combined demo-access action");
             assert(styles.includes(".modal.auth-modal { width: min(100%, 640px)") && styles.includes(".auth-form input, .auth-form select { width: 100%; min-height: 52px") && styles.includes(".modal-backdrop.auth-backdrop"), "Sign-in should have a larger panel and accessible controls without resizing the guest welcome gate");
