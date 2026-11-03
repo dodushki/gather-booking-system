@@ -50,28 +50,6 @@
             </form>
           </section>
 
-          <section class="trip-chat" aria-labelledby="trip-chat-title">
-            <div class="trip-chat-heading">
-              <span class="trip-chat-mark" aria-hidden="true">g</span>
-              <div><p class="eyebrow">GATHER AI BOOKING AGENT</p><h2 id="trip-chat-title">Where would you like to <em>go?</em></h2></div>
-            </div>
-            <p class="trip-chat-description">Chat with Gather’s trip assistant to explore stays, start a booking request, or prepare a property listing.</p>
-            <div class="trip-chat-messages" id="trip-chat-messages" role="log" aria-live="polite" aria-relevant="additions text">
-              <div class="trip-chat-message assistant">Hi! Tell me where you’d like to go, when you’re traveling, or what kind of stay you have in mind. I can help you choose a place and book it right here.</div>
-            </div>
-            <div class="trip-chat-prompts" id="trip-chat-prompts" aria-label="Try asking">
-              <button type="button" data-trip-prompt="Find me a quiet beach stay in Siargao">Find a beach stay</button>
-              <button type="button" data-trip-prompt="Find a cozy mountain stay in Baguio">Plan a Baguio trip</button>
-              <button type="button" data-trip-prompt="I want to list my property">List my property</button>
-            </div>
-            <form id="trip-chat-form" class="trip-chat-form">
-              <label class="sr-only" for="trip-chat-prompt">Message the Gather trip assistant</label>
-              <textarea id="trip-chat-prompt" name="prompt" rows="2" maxlength="800" required placeholder="Try: Find me a beach stay in Siargao for 2 guests…"></textarea>
-              <button class="button button-dark" type="submit">Send <span aria-hidden="true">→</span></button>
-            </form>
-            <p class="trip-chat-privacy">Gather’s AI uses a secure server connection to generate replies. Your messages and public listing details are sent to the configured AI provider; don’t share passwords or payment details. Review and confirm every booking before it’s saved.</p>
-          </section>
-
           <section class="home-discovery" aria-labelledby="destinations-title">
             <div class="section-heading home-section-heading">
               <div><p class="eyebrow">A GOOD PLACE TO BEGIN</p><h2 id="destinations-title">Where will you <em>unwind?</em></h2></div>
@@ -199,8 +177,8 @@
             <details class="feature-guide-group">
               <summary><span class="guide-summary-copy"><strong>AI help and booking information</strong><small>Trip assistance, account access, and booking request expectations</small></span><span class="guide-count">3 talking points</span></summary>
               <ul class="guide-script-list">
-                <li><span><strong>AI booking agent:</strong> Ask for recommendations using Gather’s listed stays, discuss trip details, or prepare a host listing draft.</span><a href="#home" data-tab-link="home" data-scroll-target="trip-chat">Open Gather chat</a></li>
-                <li><span><strong>Booking with AI:</strong> The assistant can collect dates and guest count, but Gather checks the details on file and saves only a pending request after guest confirmation.</span><a href="#home" data-tab-link="home" data-scroll-target="trip-chat">Show the assistant</a></li>
+                <li><span><strong>AI booking agent:</strong> Ask for recommendations using Gather’s listed stays, discuss trip details, or prepare a host listing draft.</span><a href="#home" data-tab-link="home" data-open-chat="true">Open Gather chat</a></li>
+                <li><span><strong>Booking with AI:</strong> The assistant can collect dates and guest count, but Gather checks the details on file and saves only a pending request after guest confirmation.</span><a href="#home" data-tab-link="home" data-open-chat="true">Show the assistant</a></li>
                 <li><span><strong>Booking requests:</strong> A request is saved in Gather, not sent to the property or confirmed. Contact the property directly to verify availability and terms; no payment is collected on Gather.</span><button type="button" class="guide-text-button" id="guide-booking-note">Review booking information</button></li>
               </ul>
             </details>
@@ -220,6 +198,34 @@
         </section>
       </main>
     </div>
+
+    <aside class="floating-chat-widget" id="floating-chat-widget" aria-label="Gather trip assistant">
+      <section class="trip-chat floating-chat-panel" id="trip-chat-panel" role="dialog" aria-modal="false" aria-labelledby="trip-chat-title" hidden>
+        <div class="trip-chat-heading">
+          <span class="trip-chat-mark" aria-hidden="true">g</span>
+          <div><p class="eyebrow">GATHER AI · HERE TO HELP</p><h2 id="trip-chat-title">Plan your <em>stay.</em></h2></div>
+          <button type="button" class="chat-panel-close" id="chat-panel-close" aria-label="Close Gather chat">×</button>
+        </div>
+        <p class="trip-chat-description">Ask about destinations, stays, or preparing a property listing.</p>
+        <div class="trip-chat-messages" id="trip-chat-messages" role="log" aria-live="polite" aria-relevant="additions text">
+          <div class="trip-chat-message assistant">Hi! Tell me where you’d like to go, when you’re traveling, or what kind of stay you have in mind. I can help you choose a place and book it right here.</div>
+        </div>
+        <div class="trip-chat-prompts" id="trip-chat-prompts" aria-label="Try asking">
+          <button type="button" data-trip-prompt="Find me a quiet beach stay in Siargao">Find a beach stay</button>
+          <button type="button" data-trip-prompt="Find a cozy mountain stay in Baguio">Plan a Baguio trip</button>
+          <button type="button" data-trip-prompt="I want to list my property">List my property</button>
+        </div>
+        <form id="trip-chat-form" class="trip-chat-form">
+          <label class="sr-only" for="trip-chat-prompt">Message the Gather trip assistant</label>
+          <textarea id="trip-chat-prompt" name="prompt" rows="2" maxlength="800" required placeholder="Ask Gather anything…"></textarea>
+          <button class="button button-dark" type="submit">Send <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="trip-chat-privacy">Your messages and public listing details are sent to the configured AI provider. Don’t share passwords or payment details.</p>
+      </section>
+      <button type="button" class="floating-chat-launcher" id="floating-chat-launcher" aria-expanded="false" aria-controls="trip-chat-panel">
+        <span class="chat-launcher-mark" aria-hidden="true">g</span><span>Ask Gather</span>
+      </button>
+    </aside>
 
     <div class="welcome-backdrop" id="welcome-gate">
       <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-disclaimer">

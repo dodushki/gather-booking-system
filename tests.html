@@ -167,6 +167,8 @@
             const functionSource = await functionResponse.text();
             const functionConfig = await (await fetch("./supabase/config.toml")).text();
             const dataScript = await (await fetch("./supabase-data.js")).text();
+            assert(markup.includes('id="floating-chat-launcher"') && markup.includes('aria-expanded="false" aria-controls="trip-chat-panel"') && markup.includes('id="trip-chat-panel"') && markup.includes('id="chat-panel-close"'), "The trip assistant should open from a closed floating launcher on every page");
+            assert(styles.includes(".floating-chat-widget { z-index: 45; position: fixed;") && appScript.includes('event.key === "Escape"') && appScript.includes('nav.dataset.openChat === "true"'), "The floating chat should have keyboard dismissal and remain reachable from the presenter guide");
             assert(chatScript.includes("GatherSupabase.chatAssistant") && chatScript.includes("GatherAssistant.startBooking"), "Chat should use a generative assistant and retain Gather’s booking safeguards");
             assert(functionResponse.ok && functionSource.includes("GATHER_AI_BASE_URL") && functionSource.includes("GATHER_AI_API_KEY") && functionSource.includes("GATHER_AI_MODEL"), "The secure server function should accept an OpenAI-compatible provider configured via server secrets");
             assert(functionSource.includes('timeZone: "Asia/Manila"') && functionSource.includes("currentPhilippineDateTime"), "The AI prompt should provide the current Philippines date and time instead of relying on the model to guess");

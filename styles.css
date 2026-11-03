@@ -112,6 +112,34 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
 .trip-chat-form .button { min-height: 48px; padding: 0 18px; }
 .trip-chat-form .button:disabled { opacity: .7; cursor: wait; }
 .trip-chat-privacy { margin: 11px 0 0; color: #718076; font-size: 11px; line-height: 1.5; }
+.floating-chat-widget { z-index: 45; position: fixed; right: max(20px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; flex-direction: column; gap: 12px; pointer-events: none; }
+.floating-chat-widget > * { pointer-events: auto; }
+.floating-chat-launcher { min-height: 56px; display: inline-flex; align-items: center; gap: 10px; border: 0; border-radius: 30px; padding: 7px 17px 7px 8px; background: var(--green-dark); color: #fff; box-shadow: 0 8px 26px rgba(20, 57, 39, .25); cursor: pointer; font: 650 14px var(--sans); transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+.floating-chat-launcher:hover { transform: translateY(-2px); background: var(--green); box-shadow: 0 11px 30px rgba(20, 57, 39, .3); }
+.chat-launcher-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.16); color: white; font-family: var(--serif); font-size: 27px; font-style: italic; }
+.floating-chat-panel { width: min(410px, calc(100vw - 40px)); max-height: min(680px, calc(100vh - 100px)); margin: 0; display: flex; flex-direction: column; gap: 0; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #dce7dc; border-radius: 16px; padding: 18px; background: #f8faf5; box-shadow: 0 16px 48px rgba(24, 49, 33, .22); animation: chat-panel-in .18s ease-out; }
+.floating-chat-panel[hidden] { display: none; }
+.floating-chat-panel .trip-chat-heading { gap: 10px; }
+.floating-chat-panel .trip-chat-mark { width: 36px; height: 36px; font-size: 25px; }
+.floating-chat-panel .trip-chat-heading > div { min-width: 0; flex: 1; }
+.floating-chat-panel .trip-chat-heading .eyebrow { font-size: 9px; }
+.floating-chat-panel .trip-chat-heading h2 { font-size: 21px; }
+.chat-panel-close { width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid #e0e8e1; border-radius: 50%; background: #fff; color: #607066; cursor: pointer; font: 400 24px/1 var(--sans); }
+.chat-panel-close:hover { border-color: #9ab4a2; color: var(--green-dark); }
+.floating-chat-panel .trip-chat-description { margin: 9px 0 12px; font-size: 12px; }
+.floating-chat-panel .trip-chat-messages { min-height: 140px; max-height: min(38vh, 310px); padding: 11px; }
+.floating-chat-panel .trip-chat-message { font-size: 13px; }
+.floating-chat-panel .trip-chat-prompts { gap: 6px; margin-top: 9px; }
+.floating-chat-panel .trip-chat-prompts button { padding: 6px 9px; font-size: 11px; }
+.floating-chat-panel .trip-chat-form { gap: 8px; margin-top: 10px; }
+.floating-chat-panel .trip-chat-form textarea { min-height: 46px; max-height: 100px; resize: vertical; padding: 10px 11px; font-size: 16px; }
+.floating-chat-panel .trip-chat-form .button { min-height: 46px; padding: 0 13px; }
+.floating-chat-panel .trip-chat-privacy { margin-top: 9px; font-size: 10px; }
+body.welcome-gate-open .floating-chat-widget,
+body.modal-open .floating-chat-widget,
+body.map-open .floating-chat-widget { visibility: hidden; }
+@keyframes chat-panel-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .floating-chat-panel { animation: none; } .floating-chat-launcher { transition: none; } }
 .home-discovery, .home-featured, .how-it-works { padding: 0 0 52px; }
 .home-section-heading, .home-featured > .section-heading { align-items: end; margin-bottom: 19px; }
 .destination-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
@@ -504,6 +532,8 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
   .trip-chat-messages { max-height: 300px; padding: 11px; }
   .trip-chat-form { grid-template-columns: 1fr; }
   .trip-chat-form .button { width: 100%; }
+  .floating-chat-widget { right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); }
+  .floating-chat-panel { width: calc(100vw - 24px); max-height: calc(100vh - 88px); margin: 0; padding: 14px; }
   .search-panel { margin-bottom: 34px; padding: 6px; }
   .search-grid { grid-template-columns: 1fr 1fr; }
   .home-view .search-grid { grid-template-columns: 1fr 1fr; }

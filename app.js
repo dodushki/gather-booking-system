@@ -1177,6 +1177,26 @@
     });
   });
   $("#welcome-dismiss").addEventListener("click", dismissWelcomeGate);
+  function setTripChatOpen(isOpen) {
+    const panel = $("#trip-chat-panel");
+    const launcher = $("#floating-chat-launcher");
+    panel.hidden = !isOpen;
+    launcher.setAttribute("aria-expanded", String(isOpen));
+    if (isOpen) window.requestAnimationFrame(() => $("#trip-chat-prompt").focus());
+    else launcher.focus();
+  }
+  $("#floating-chat-launcher").addEventListener("click", () => {
+    setTripChatOpen($("#trip-chat-panel").hidden);
+  });
+  $("#chat-panel-close").addEventListener("click", () => setTripChatOpen(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("#trip-chat-panel").hidden &&
+        !document.body.classList.contains("modal-open") &&
+        !document.body.classList.contains("welcome-gate-open") &&
+        !document.body.classList.contains("map-open")) {
+      setTripChatOpen(false);
+    }
+  });
   $("#sort-select").addEventListener("change", (event) => {
     sortMode = event.currentTarget.value;
     renderOfferings();
@@ -1299,6 +1319,9 @@
             $("#expand-map").click();
           }
         });
+      }
+      if (nav.dataset.openChat === "true") {
+        window.requestAnimationFrame(() => setTripChatOpen(true));
       }
       return;
     }

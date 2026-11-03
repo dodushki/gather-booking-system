@@ -36,7 +36,7 @@ Row-level security limits profile access to its owner, listings to their host fo
 
 ## Gather booking assistant
 
-Gather’s trip chat uses a hosted, streaming model to respond naturally, answer greetings, and help people discover Philippines stays. The current deployment uses Groq’s OpenAI-compatible chat API through a Supabase Edge Function. The provider and model are configurable; requests run on the provider’s servers, not your PC or your visitors’ devices. The website does not contain the provider API token.
+Gather’s trip chat is available from the floating **Ask Gather** button on every page. It uses a hosted, streaming model to respond naturally, answer greetings, and help people discover Philippines stays. The current deployment uses Groq’s OpenAI-compatible chat API through a Supabase Edge Function. The provider and model are configurable; requests run on the provider’s servers, not your PC or your visitors’ devices. The website does not contain the provider API token.
 
 To enable AI replies:
 
