@@ -202,6 +202,17 @@
                 <li><span><strong>Demo limitations:</strong> Listings, prices, ratings, availability, and bookings are examples. The site does not reserve real accommodation or process payments.</span><button type="button" class="guide-text-button" id="guide-demo-details">Read the demo note</button></li>
               </ul>
             </details>
+            <details class="feature-guide-group">
+              <summary><span class="guide-summary-copy"><strong>Tools and services behind Gather</strong><small>The technology and online services used in this demo</small></span><span class="guide-count">6 talking points</span></summary>
+              <ul class="guide-script-list">
+                <li><span><strong>Website and publishing:</strong> Gather uses HTML, CSS, and JavaScript, and is published with GitHub Pages.</span></li>
+                <li><span><strong>Accounts and shared data:</strong> Supabase Auth, Postgres, and Storage support accounts, listings, bookings, favourites, availability, and host-uploaded photos.</span></li>
+                <li><span><strong>AI chat:</strong> A Supabase Edge Function securely connects Gather to its configured Groq AI service; provider credentials stay in server-side secrets.</span></li>
+                <li><span><strong>Booking email:</strong> EmailJS sends configured booking notifications to the owner’s Gmail inbox for standard account bookings. Demo guest bookings do not send email.</span></li>
+                <li><span><strong>Interactive map:</strong> Leaflet displays Esri map tiles, with OpenStreetMap attribution and a Philippines boundary from geoBoundaries, OCHA Philippines, and NAMRIA.</span></li>
+                <li><span><strong>Photography:</strong> Stay photos are stored in the project; the home-page hero image loads from Unsplash. Images are illustrative and may not show the listed stay.</span></li>
+              </ul>
+            </details>
           </div>
           <p class="feature-guide-note"><strong>Short intro to read aloud:</strong> “Gather is a Philippines-focused stay-booking demo. Guests can explore stays, check dates, and review a booking before confirming. Hosts can manage sample listings and availability. The map is clickable and expandable, and the AI assistant helps people explore the demo.”</p>
         </section>

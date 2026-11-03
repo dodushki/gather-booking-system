@@ -34,15 +34,15 @@ Row-level security limits profile access to its owner, listings to their host fo
 
 ## Gather booking assistant
 
-Gather’s trip chat uses a hosted, streaming model to respond naturally, answer greetings, and help people discover Philippines stays. The current integration targets Cloudflare Workers AI’s OpenAI-compatible chat endpoint with the open-weight Llama 3.2 3B Instruct model. It runs on Cloudflare’s servers, not your PC or your visitors’ devices. The website does not contain the provider API token.
+Gather’s trip chat uses a hosted, streaming model to respond naturally, answer greetings, and help people discover Philippines stays. The current deployment uses Groq’s OpenAI-compatible chat API through a Supabase Edge Function. The provider and model are configurable; requests run on the provider’s servers, not your PC or your visitors’ devices. The website does not contain the provider API token.
 
 To enable AI replies:
 
-1. In Cloudflare, enable Workers AI and create an API token with permission to run Workers AI models. Copy the account ID from your Cloudflare dashboard.
-2. In the Supabase project’s **Edge Function secrets**, set `GATHER_AI_BASE_URL` to `https://api.cloudflare.com/client/v4/accounts/YOUR_CLOUDFLARE_ACCOUNT_ID/ai/v1`, `GATHER_AI_API_KEY` to your Cloudflare API token, and `GATHER_AI_MODEL` to `@cf/meta/llama-3.2-3b-instruct`. Enter the token only in Supabase secrets; never paste it into chat or commit it to the repository.
+1. In Groq, create an API key and choose a currently available chat model.
+2. In the Supabase project’s **Edge Function secrets**, set `GATHER_AI_BASE_URL` to `https://api.groq.com/openai/v1`, `GATHER_AI_API_KEY` to your Groq API key, and `GATHER_AI_MODEL` to the model you chose. Enter the key only in Supabase secrets; never paste it into chat or commit it to the repository.
 3. From a terminal with the Supabase CLI installed, run `supabase login`, `supabase link --project-ref gcrxsoacrdzyksutwjga`, then `supabase functions deploy gather-chat`.
 
-Cloudflare’s free allowance, quotas, model availability, and terms can change, so AI use is not guaranteed to remain free. Until the function and secrets are configured, Gather will explain that its AI is unavailable.
+Groq’s quotas, model availability, and terms can change. Until the function and secrets are configured, Gather will explain that its AI is unavailable.
 
 The function validates chat history, sends only the conversation and public listing details to the configured provider, and streams its response to the browser. Do not send passwords, payment information, or other sensitive details in chat. For booking assistance, the model can recommend only supplied listings; Gather verifies any selected stay against current availability, gathers dates and guests in chat, shows the total, and requires explicit confirmation before saving through Gather’s booking service. The model cannot create or confirm bookings on its own. Listing preparation continues to use Gather’s guided draft flow and editable listing form.
 
