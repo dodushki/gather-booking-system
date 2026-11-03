@@ -196,6 +196,10 @@
             assert(schema.includes("or public.is_gather_admin()") && schema.includes("perform pg_advisory_xact_lock(hashtext(p_offering_id))"), "Administrators should manage all listings and booking conflict checks should be serialized");
             assert(appScript.includes('currentUser.role === "admin"') && appScript.includes('data-edit-booking="${escapeHtml(booking.id)}"') && appScript.includes('id="admin-booking-form"') && dataScript.includes('client.rpc("update_booking_admin"'), "The admin dashboard should edit bookings through the protected database function");
             assert(styles.includes(".booking-admin-edit") && styles.includes(".host-booking { align-items: start; flex-wrap: wrap;"), "Admin booking controls should remain usable on narrow screens");
+            assert(styles.includes(".brand { display: inline-flex; align-items: center; gap: 10px;") && styles.includes("font-size: 26px; font-weight: 700;") && styles.includes(".brand-mark { width: 38px; height: 38px;"), "The Gather wordmark and mark should be more prominent in the header");
+            assert(styles.includes("padding: 46px 0 42px;") && styles.includes("margin: 0 0 76px;") && styles.includes("padding: 0 0 76px;"), "Homepage sections should have clear, generous vertical separation");
+            assert(styles.includes(".brand-mark { width: 32px; height: 32px; font-size: 24px; }") && styles.includes("margin-bottom: 50px;") && styles.includes("padding-bottom: 52px;"), "The larger brand and section spacing should adapt for mobile");
+            assert(markup.includes("styles.css?v=20261103-spacing"), "The updated visual style should bypass stale browser CSS caches");
           });
           await testAsync("streams real AI replies through the authenticated Supabase proxy", async function () {
             const source = await (await fetch("./supabase-data.js")).text();
