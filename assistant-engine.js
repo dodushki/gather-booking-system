@@ -191,7 +191,8 @@
     const preferences = { ...(previousState.preferences || {}) };
     const destination = extractLocation(prompt, offerings);
     const category = extractCategory(prompt);
-    const guests = extractGuests(prompt);
+    const guests = extractGuests(prompt) ||
+      (previousState.bookingDraft && /^\d{1,2}$/.test(String(prompt).trim()) ? Number(prompt.trim()) : null);
     const amount = numberFromText(prompt);
     const dates = extractDates(prompt);
     if (destination) preferences.destination = destination;

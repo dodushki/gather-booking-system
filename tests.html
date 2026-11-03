@@ -164,6 +164,7 @@
             const dataScript = await (await fetch("./supabase-data.js")).text();
             assert(chatScript.includes("GatherSupabase.chatAssistant") && chatScript.includes("GatherAssistant.startBooking"), "Chat should use a generative assistant and retain Gather’s booking safeguards");
             assert(functionResponse.ok && functionSource.includes("GATHER_AI_BASE_URL") && functionSource.includes("GATHER_AI_API_KEY") && functionSource.includes("GATHER_AI_MODEL"), "The secure server function should accept an OpenAI-compatible provider configured via server secrets");
+            assert(functionSource.includes('timeZone: "Asia/Manila"') && functionSource.includes("currentPhilippineDateTime"), "The AI prompt should provide the current Philippines date and time instead of relying on the model to guess");
             assert(functionConfig.includes("[functions.gather-chat]") && functionConfig.includes("verify_jwt = true"), "The AI proxy should require an authenticated Gather session");
             assert(dataScript.includes("functions/v1/gather-chat") && !markup.includes("GATHER_AI_API_KEY"), "The AI provider secret must stay on the server and never appear in the website");
             assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes("window.GatherChatBookingPreferences") && appScript.includes("GatherChatActions"), "Assistant actions should connect to Gather’s booking and editable listing flows");
@@ -235,8 +236,8 @@
             const checkout = api.addDays(checkin, 3);
             const withDates = window.GatherAssistant.respond(`${checkin} to ${checkout}`, data, selected.state);
             assert(!withDates.bookingReady && /how many guests/i.test(withDates.reply), "Should collect the guest count after the dates");
-            const ready = window.GatherAssistant.respond("2 guests", data, withDates.state);
-            assert(ready.bookingReady && ready.bookingReady.offeringId === offering.id, "Should prepare booking details for the selected stay");
+            const ready = window.GatherAssistant.respond("2", data, withDates.state);
+            assert(ready.bookingReady && ready.bookingReady.offeringId === offering.id, "Should accept a bare guest count and prepare booking details for the selected stay");
             assert(ready.bookingReady.total === offering.price * 3 && ready.bookingReady.guests === 2, "The chat summary should calculate the stay total and guests");
             const sampleArrival = new Date();
             sampleArrival.setDate(sampleArrival.getDate() + 25);
