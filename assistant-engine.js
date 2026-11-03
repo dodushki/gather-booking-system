@@ -61,9 +61,41 @@
   }
 
   function extractDates(text) {
-    const dates = String(text || "").match(/\b\d{4}-\d{2}-\d{2}\b/g) || [];
-    if (dates.length < 2) return null;
-    return { checkin: dates[0], checkout: dates[1] };
+    const value = String(text || "");
+    const isoDates = value.match(/\b\d{4}-\d{2}-\d{2}\b/g) || [];
+    if (isoDates.length >= 2) return { checkin: isoDates[0], checkout: isoDates[1] };
+
+    const months = {
+      jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
+      may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
+      sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10,
+      dec: 11, december: 11
+    };
+    const match = value.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?\s*(?:to|through|until|[-–])\s*(?:(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?/i);
+    if (!match) return null;
+    const now = new Date();
+    const checkinMonth = months[match[1].toLowerCase()];
+    const checkoutMonth = match[4] ? months[match[4].toLowerCase()] : checkinMonth;
+    let checkinYear = Number(match[3] || match[6] || now.getFullYear());
+    let checkoutYear = Number(match[6] || match[3] || checkinYear);
+    let checkin = new Date(checkinYear, checkinMonth, Number(match[2]));
+    let checkout = new Date(checkoutYear, checkoutMonth, Number(match[5]));
+    if (checkin.getMonth() !== checkinMonth || checkout.getMonth() !== checkoutMonth) return null;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (!match[3] && !match[6] && checkin < today) {
+      checkinYear += 1;
+      checkoutYear += 1;
+      checkin = new Date(checkinYear, checkinMonth, Number(match[2]));
+      checkout = new Date(checkoutYear, checkoutMonth, Number(match[5]));
+    } else if (!match[6] && checkout < checkin) {
+      checkoutYear += 1;
+      checkout = new Date(checkoutYear, checkoutMonth, Number(match[5]));
+    }
+    if (checkout <= checkin) return null;
+    return {
+      checkin: root.GatherBooking.toDateString(checkin),
+      checkout: root.GatherBooking.toDateString(checkout)
+    };
   }
 
   function listingIntent(text) {
@@ -168,6 +200,77 @@
     if (amount) preferences.maxPrice = amount;
     if (dates) preferences.dates = dates;
 
+    if (previousState.bookingDraft) {
+      const selectedOffering = offerings.find((offering) => offering.id === previousState.bookingDraft.offeringId);
+      if (!selectedOffering) {
+        return {
+          reply: "That stay is no longer listed. Tell me where and when you’d like to go, and I’ll find another option.",
+          stays: [],
+          state: { mode: "booking", preferences, listingDraft: {}, listingStep: "" }
+        };
+      }
+      const bookingDraft = {
+        offeringId: selectedOffering.id,
+        dates: dates || previousState.bookingDraft.dates || preferences.dates || null,
+        guests: guests || previousState.bookingDraft.guests || preferences.guests || null
+      };
+      const checkin = bookingDraft.dates && root.GatherBooking.parseDate(bookingDraft.dates.checkin);
+      const checkout = bookingDraft.dates && root.GatherBooking.parseDate(bookingDraft.dates.checkout);
+      if (bookingDraft.dates && (!checkin || !checkout || bookingDraft.dates.checkin < root.GatherBooking.toDateString(new Date()) || checkout <= checkin)) {
+        return {
+          reply: "Those dates don’t look valid or are in the past. Send future check-in and check-out dates, for example 2026-11-12 to 2026-11-14.",
+          stays: [],
+          state: { mode: "booking", preferences, bookingDraft, listingDraft: {}, listingStep: "" }
+        };
+      }
+      if (bookingDraft.guests && bookingDraft.guests > Number(selectedOffering.guests)) {
+        return {
+          reply: `${selectedOffering.name} can host up to ${selectedOffering.guests} guests. How many people should I book for?`,
+          stays: [],
+          state: { mode: "booking", preferences, bookingDraft: { ...bookingDraft, guests: null }, listingDraft: {}, listingStep: "" }
+        };
+      }
+      if (!bookingDraft.dates) {
+        return {
+          reply: `What are your check-in and check-out dates for ${selectedOffering.name}? You can say “November 12 to November 14” or use YYYY-MM-DD.`,
+          stays: [],
+          state: { mode: "booking", preferences, bookingDraft, listingDraft: {}, listingStep: "" }
+        };
+      }
+      if (!bookingDraft.guests) {
+        return {
+          reply: `How many guests should I book ${selectedOffering.name} for? It can host up to ${selectedOffering.guests}.`,
+          stays: [],
+          state: { mode: "booking", preferences, bookingDraft, listingDraft: {}, listingStep: "" }
+        };
+      }
+      if (!root.GatherBooking.isAvailable(
+        selectedOffering, bookingDraft.dates.checkin, bookingDraft.dates.checkout,
+        (data.bookings || []).concat(data.unavailableDates || []), bookingDraft.guests
+      )) {
+        return {
+          reply: `I can’t book ${selectedOffering.name} for those dates; they may be unavailable or shorter than its minimum stay. Send different dates and I’ll check again.`,
+          stays: [],
+          state: { mode: "booking", preferences, bookingDraft: { ...bookingDraft, dates: null }, listingDraft: {}, listingStep: "" }
+        };
+      }
+      const nights = root.GatherBooking.getNights(bookingDraft.dates.checkin, bookingDraft.dates.checkout);
+      return {
+        reply: `I can book ${selectedOffering.name} in ${selectedOffering.location} for ${bookingDraft.guests} ${bookingDraft.guests === 1 ? "guest" : "guests"}, ${nights} ${nights === 1 ? "night" : "nights"} (${bookingDraft.dates.checkin} to ${bookingDraft.dates.checkout}). The total is ₱${(Number(selectedOffering.price) * nights).toLocaleString("en-PH")}. Select Confirm booking to continue; Gather will ask you to confirm before saving.`,
+        stays: [],
+        bookingReady: {
+          offeringId: selectedOffering.id,
+          offeringName: selectedOffering.name,
+          checkin: bookingDraft.dates.checkin,
+          checkout: bookingDraft.dates.checkout,
+          guests: bookingDraft.guests,
+          nights,
+          total: Number(selectedOffering.price) * nights
+        },
+        state: { mode: "booking", preferences, bookingDraft, listingDraft: {}, listingStep: "" }
+      };
+    }
+
     const query = normalize(prompt);
     const words = query.split(/\s+/).filter((word) => word.length > 2 && !stopWords.has(word));
     const requestedAmenities = knownAmenities.filter((amenity) => {
@@ -212,7 +315,7 @@
       };
     }
     const label = preferences.destination ? `in ${preferences.destination}` : preferences.category ? `for ${preferences.category.toLowerCase()}` : "from Gather’s current listings";
-    const dateNote = preferences.dates ? " I checked those dates against Gather’s current availability records; please confirm them again in the booking form." : " Availability depends on your dates, which you can confirm in the booking form.";
+    const dateNote = preferences.dates ? " I checked those dates against Gather’s current availability records." : " Select a stay and I’ll help you finish the booking here in chat.";
     const opening = scored.length === 1 ? "I found a stay" : "Here are a few stays";
     return {
       reply: `${opening} ${label}.${dateNote}`,
@@ -221,15 +324,34 @@
     };
   }
 
+  function startBooking(offeringId, data, previousState) {
+    const offering = (data.offerings || []).find((item) => item.id === offeringId);
+    if (!offering) {
+      return {
+        reply: "I couldn’t find that stay in Gather’s current listings. Please choose another one.",
+        stays: [],
+        state: previousState || {}
+      };
+    }
+    const preferences = { ...((previousState && previousState.preferences) || {}) };
+    const bookingDraft = {
+      offeringId: offering.id,
+      dates: preferences.dates || null,
+      guests: preferences.guests || null
+    };
+    return getBookingReply("", data, { ...previousState, mode: "booking", preferences, bookingDraft });
+  }
+
   function respond(prompt, data, previousState) {
     const text = String(prompt || "").trim();
     const current = previousState || {};
     const startListing = listingIntent(text);
-    const switchToBooking = bookingIntent(text) && !startListing;
+    const switchToBooking = (bookingIntent(text) || /\b(?:find|search|show)\b.*\b(?:another|different|stay|place)\b/i.test(text)) && !startListing;
     const mode = startListing ? "listing" : switchToBooking ? "booking" : current.mode;
     if (mode === "listing") return getListingReply(text, data.offerings || [], current, startListing);
-    return getBookingReply(text, data, current);
+    if (current.bookingDraft && !switchToBooking) return getBookingReply(text, data, current);
+    return getBookingReply(text, data, switchToBooking ? { ...current, bookingDraft: null } : current);
   }
 
-  return { respond, extractGuests, extractCategory, extractLocation, extractDates };
+  return { respond, startBooking, extractGuests, extractCategory, extractLocation, extractDates };
 });

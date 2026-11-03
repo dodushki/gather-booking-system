@@ -4,6 +4,7 @@
   const form = document.querySelector("#trip-chat-form");
   const input = document.querySelector("#trip-chat-prompt");
   const messagesElement = document.querySelector("#trip-chat-messages");
+  const promptSuggestions = document.querySelector("#trip-chat-prompts");
   if (!form || !input || !messagesElement) return;
 
   let isSending = false;
@@ -21,28 +22,74 @@
   function resetConversation() {
     conversationState = {};
     messagesElement.replaceChildren();
-    addMessage("assistant", "Hi! I can help you find a stay or prepare a property listing. Tell me what you’re looking for.");
+    addMessage("assistant", "Hi! Tell me where you’d like to go, when you’re traveling, or what kind of stay you have in mind. I can help you choose a place and book it right here.");
+    if (promptSuggestions) promptSuggestions.hidden = false;
   }
 
+  document.querySelectorAll("[data-trip-prompt]").forEach((button) => {
+    button.addEventListener("click", () => {
+      input.value = button.dataset.tripPrompt;
+      form.requestSubmit();
+    });
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
   function addAssistantActions(message, result) {
-    if (!result.stays.length && !result.listingDraft) return;
+    if (!result.stays.length && !result.listingDraft && !result.bookingReady) return;
     const actions = document.createElement("div");
     actions.className = "trip-chat-actions";
     result.stays.forEach((offering) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "button button-outline";
-      button.dataset.openOffering = String(offering.id);
-      button.textContent = `Check dates · ${offering.name} · ₱${Number(offering.price).toLocaleString("en-PH")}/night`;
-      button.addEventListener("click", () => {
-        const preferences = result.state.preferences || {};
-        window.GatherChatBookingPreferences = {
-          guests: preferences.guests || null,
-          dates: preferences.dates || null
-        };
+      button.dataset.bookOffering = String(offering.id);
+      button.textContent = `Book with Gather · ${offering.name} · ₱${Number(offering.price).toLocaleString("en-PH")}/night`;
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          const data = await window.GatherSupabase.loadData(null);
+          const next = window.GatherAssistant.startBooking(offering.id, data, result.state);
+          conversationState = next.state;
+          const reply = addMessage("assistant", next.reply);
+          addAssistantActions(reply, next);
+        } catch (error) {
+          console.error("Gather could not start this booking.", error);
+          addMessage("assistant", `I couldn’t start that booking. ${error.message || "Please try again."}`, true);
+          button.disabled = false;
+        }
       });
       actions.appendChild(button);
     });
+    if (result.bookingReady) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button button-dark";
+      button.textContent = `Confirm booking · ₱${result.bookingReady.total.toLocaleString("en-PH")}`;
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          const outcome = await window.GatherChatActions.confirmBooking(result.bookingReady);
+          if (outcome.requiresSignIn) {
+            addMessage("assistant", "Please sign in or continue as a demo guest to finish. Gather has carried your selected stay and dates into the booking form.");
+          } else if (outcome.cancelled) {
+            addMessage("assistant", "No booking was made. Your stay details are still here if you’d like to confirm later.");
+            button.disabled = false;
+          } else {
+            addMessage("assistant", `Your ${outcome.nights}-night stay at ${outcome.offeringName} is booked. You can review it in My bookings.`);
+          }
+        } catch (error) {
+          console.error("Gather could not complete the chat booking.", error);
+          addMessage("assistant", `I couldn’t complete that booking. ${error.message || "Please try again."}`, true);
+          button.disabled = false;
+        }
+      });
+      actions.appendChild(button);
+    }
     if (result.listingDraft) {
       const button = document.createElement("button");
       button.type = "button";
@@ -70,6 +117,7 @@
     }
 
     isSending = true;
+    if (promptSuggestions) promptSuggestions.hidden = true;
     const submitButton = form.querySelector('button[type="submit"]');
     submitButton.disabled = true;
     input.disabled = true;

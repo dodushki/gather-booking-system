@@ -103,6 +103,10 @@ h1 em, h2 em { color: var(--green); font-weight: 500; }
 .trip-chat-message.error { border-color: #e6c6bd; background: #fff8f5; color: #8d4031; }
 .trip-chat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
 .trip-chat-actions .button { min-height: 38px; font-size: 12px; }
+.trip-chat-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.trip-chat-prompts[hidden] { display: none; }
+.trip-chat-prompts button { border: 1px solid #d5e0d6; border-radius: 18px; padding: 7px 11px; background: #fff; color: #52665a; font-size: 12px; cursor: pointer; }
+.trip-chat-prompts button:hover { border-color: var(--green); color: var(--green-dark); }
 .trip-chat-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; margin-top: 12px; }
 .trip-chat-form textarea { width: 100%; min-height: 48px; max-height: 130px; resize: vertical; border: 1px solid #cbd9ce; border-radius: 7px; padding: 12px 14px; background: #fff; color: var(--ink); font-size: 15px; line-height: 1.45; }
 .trip-chat-form textarea:focus-visible { border-color: var(--green); outline: 3px solid rgba(61, 112, 94, .18); outline-offset: 1px; }

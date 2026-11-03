@@ -878,6 +878,10 @@
       return;
     }
     closeModal();
+    finishBooking(booking);
+  }
+
+  function finishBooking(booking) {
     state.bookings.push(booking);
     navigate("bookings");
     refreshSharedData().catch((refreshError) => {
@@ -898,6 +902,49 @@
       });
     }
   }
+
+  async function confirmChatBooking(details) {
+    if (!currentUser) {
+      window.GatherChatBookingPreferences = {
+        guests: details.guests,
+        dates: { checkin: details.checkin, checkout: details.checkout }
+      };
+      openBookingModal(details.offeringId);
+      return { requiresSignIn: true };
+    }
+
+    const checkin = String(details.checkin || "");
+    const checkout = String(details.checkout || "");
+    const guests = Number(details.guests);
+    if (!Booking.parseDate(checkin) || !Booking.parseDate(checkout) ||
+        !Number.isInteger(guests) || guests < 1 || guests > 20) {
+      throw new Error("Please provide valid future dates and a guest count before booking.");
+    }
+
+    const latest = await GatherData.loadData(currentUser);
+    const offering = latest.offerings.find((item) => item.id === details.offeringId);
+    if (!offering) throw new Error("This stay is no longer listed.");
+    if (!Booking.isAvailable(
+      offering, checkin, checkout, latest.bookings.concat(latest.unavailableDates), guests
+    )) {
+      throw new Error("This stay is no longer available for those dates. Send new dates and I’ll check again.");
+    }
+    const nights = Booking.getNights(checkin, checkout);
+    const total = Number(offering.price) * nights;
+    const confirmed = await requestConfirmation({
+      title: currentUser.isAnonymous ? "Add this demo booking?" : "Confirm your booking?",
+      message: `Review your stay at ${offering.name}: ${stayDates(checkin, checkout)}, ${nights} ${nights === 1 ? "night" : "nights"}, ${guests} ${guests === 1 ? "guest" : "guests"}. Estimated total: ${money(total)}.${currentUser.isAnonymous ? " This adds a shared demo record only—no host or real accommodation is contacted." : " This will create a reservation."}`,
+      confirmLabel: currentUser.isAnonymous ? "Add demo booking" : "Confirm booking"
+    });
+    if (!confirmed) return { cancelled: true };
+
+    const booking = await GatherData.createBooking({
+      offeringId: offering.id, checkin, checkout, guests, notes: ""
+    });
+    finishBooking(booking);
+    return booking;
+  }
+  window.GatherChatActions = Object.freeze({ confirmBooking: confirmChatBooking });
 
   function closeModal() {
     elements.modal.classList.add("hidden");

@@ -60,16 +60,21 @@
               <span class="trip-chat-mark" aria-hidden="true">g</span>
               <div><p class="eyebrow">GATHER TRIP ASSISTANT</p><h2 id="trip-chat-title">Where would you like to <em>go?</em></h2></div>
             </div>
-            <p class="trip-chat-description">Get help finding and booking a stay, or preparing a property listing—all in one conversation.</p>
+            <p class="trip-chat-description">Chat with Gather’s trip assistant to find a stay, book it here, or prepare a property listing.</p>
             <div class="trip-chat-messages" id="trip-chat-messages" role="log" aria-live="polite" aria-relevant="additions text">
-              <div class="trip-chat-message assistant">Hi! I can help you plan a stay or prepare a property listing. Tell me what you have in mind, and we’ll take it one step at a time.</div>
+              <div class="trip-chat-message assistant">Hi! Tell me where you’d like to go, when you’re traveling, or what kind of stay you have in mind. I can help you choose a place and book it right here.</div>
+            </div>
+            <div class="trip-chat-prompts" id="trip-chat-prompts" aria-label="Try asking">
+              <button type="button" data-trip-prompt="Find me a quiet beach stay in Siargao">Find a beach stay</button>
+              <button type="button" data-trip-prompt="Find a cozy mountain stay in Baguio">Plan a Baguio trip</button>
+              <button type="button" data-trip-prompt="I want to list my property">List my property</button>
             </div>
             <form id="trip-chat-form" class="trip-chat-form">
               <label class="sr-only" for="trip-chat-prompt">Message the Gather trip assistant</label>
-              <textarea id="trip-chat-prompt" name="prompt" rows="2" maxlength="800" required placeholder="Try: I want a quiet beach trip with great food…"></textarea>
+              <textarea id="trip-chat-prompt" name="prompt" rows="2" maxlength="800" required placeholder="Try: Find me a beach stay in Siargao for 2 guests…"></textarea>
               <button class="button button-dark" type="submit">Send <span aria-hidden="true">→</span></button>
             </form>
-            <p class="trip-chat-privacy">Your message is processed in this browser; Gather checks its current listings and availability. Suggestions may be incomplete. Bookings and listings are for demonstration only.</p>
+            <p class="trip-chat-privacy">Chat runs in your browser using Gather’s own booking logic. You’ll review and confirm any reservation before it’s saved. Demo bookings don’t contact hosts or collect payment.</p>
           </section>
 
           <section class="home-discovery" aria-labelledby="destinations-title">

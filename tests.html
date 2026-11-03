@@ -155,11 +155,12 @@
             const styles = await (await fetch("./styles.css")).text();
             const chatScript = await (await fetch("./chat.js")).text();
             const engineResponse = await fetch("./assistant-engine.js");
-            assert(markup.includes('id="trip-chat-form"') && markup.includes('id="trip-chat-messages"') && markup.includes("preparing a property listing"), "One assistant should support both booking help and property listing");
+            assert(markup.includes('id="trip-chat-form"') && markup.includes('id="trip-chat-messages"') && markup.includes("property listing"), "One assistant should support both booking help and property listing");
+            assert(markup.includes('data-trip-prompt=') && chatScript.includes('event.key === "Enter"'), "The chat should offer quick prompts and Enter-to-send keyboard interaction");
             assert(engineResponse.ok && markup.includes('src="assistant-engine.js"'), "The purpose-built assistant engine should be included in the website");
             assert(chatScript.includes("GatherAssistant.respond") && chatScript.includes("GatherSupabase.loadData(null)"), "The assistant should process messages against Gather’s current public stays");
             assert(!chatScript.includes("functions/v1/gather-chat") && !chatScript.includes("api.cloudflare.com") && !chatScript.includes("api.openai.com"), "Chat should not depend on a paid AI provider or external inference API");
-            assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes("window.GatherChatBookingPreferences"), "Assistant actions should prefill Gather’s existing booking and editable listing forms");
+            assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes("window.GatherChatBookingPreferences") && appScript.includes("GatherChatActions"), "Assistant actions should connect to Gather’s booking and editable listing flows");
             assert(styles.includes(".trip-chat {") && styles.includes(".trip-chat-form { grid-template-columns: 1fr; }"), "The assistant should remain usable on mobile-sized screens");
           });
           await testAsync("recommends real stays from destination, budget, and guest preferences", function () {
@@ -173,6 +174,26 @@
             assert(unavailableResult.stays.length === 0 && unavailableResult.reply.includes("couldn’t find"), "Should exclude a real listing when the requested dates conflict with shared availability");
             const noMatch = window.GatherAssistant.respond("Find a Baguio stay for 8 guests", data, {});
             assert(noMatch.stays.length === 0 && /fewer guests/.test(noMatch.reply), "Should not recommend stays that cannot accommodate the requested group");
+          });
+          await testAsync("collects booking details in chat and prepares a confirmed reservation", function () {
+            const data = { offerings: api.DEFAULT_OFFERINGS, bookings: [], unavailableDates: [] };
+            const offering = data.offerings.find((item) => item.id === "isla-norte");
+            const selected = window.GatherAssistant.startBooking(offering.id, data, { preferences: {} });
+            assert(!selected.bookingReady && /check-in and check-out dates/i.test(selected.reply), "Should ask for dates before preparing a reservation");
+            const checkin = api.addDays(api.toDateString(new Date()), 10);
+            const checkout = api.addDays(checkin, 3);
+            const withDates = window.GatherAssistant.respond(`${checkin} to ${checkout}`, data, selected.state);
+            assert(!withDates.bookingReady && /how many guests/i.test(withDates.reply), "Should collect the guest count after the dates");
+            const ready = window.GatherAssistant.respond("2 guests", data, withDates.state);
+            assert(ready.bookingReady && ready.bookingReady.offeringId === offering.id, "Should prepare booking details for the selected stay");
+            assert(ready.bookingReady.total === offering.price * 3 && ready.bookingReady.guests === 2, "The chat summary should calculate the stay total and guests");
+            const sampleArrival = new Date();
+            sampleArrival.setDate(sampleArrival.getDate() + 25);
+            const sampleDeparture = new Date(sampleArrival);
+            sampleDeparture.setDate(sampleDeparture.getDate() + 2);
+            const month = (date) => new Intl.DateTimeFormat("en-US", { month: "long" }).format(date);
+            const namedDates = window.GatherAssistant.extractDates(`${month(sampleArrival)} ${sampleArrival.getDate()} to ${month(sampleDeparture)} ${sampleDeparture.getDate()}`);
+            assert(namedDates && namedDates.checkin === api.toDateString(sampleArrival) && namedDates.checkout === api.toDateString(sampleDeparture), "Should understand common month-and-day date phrasing");
           });
           await testAsync("guides a property host through an honest listing draft", function () {
             const data = { offerings: api.DEFAULT_OFFERINGS, bookings: [], unavailableDates: [] };
@@ -200,7 +221,7 @@
               chatWindow.GatherBooking = api;
               chatWindow.GatherAssistant = window.GatherAssistant;
               chatWindow.GatherSupabase = {
-                loadData: async () => ({ offerings: [{ id: "stay-1", name: "Siargao Stay", category: "Island stays", location: "Siargao, Philippines", description: "A sample beach stay", price: 2500, guests: 4, amenities: ["Beach access"] }], bookings: [], unavailableDates: [] })
+                loadData: async () => ({ offerings: [{ id: "stay-1", name: "Siargao Stay", category: "Island stays", location: "Siargao, Philippines", description: "A sample beach stay", price: 2500, guests: 4, amenities: ["Beach access"], days: [0, 1, 2, 3, 4, 5, 6], minimumNights: 1 }], bookings: [], unavailableDates: [] })
               };
               let listingOpenCount = 0;
               chatWindow.document.querySelector("#add-offering-button").addEventListener("click", () => { listingOpenCount += 1; });
@@ -216,9 +237,27 @@
               await send("Find a beach stay in Siargao");
               const assistant = chatWindow.document.querySelector(".trip-chat-message.assistant");
               let actions = chatWindow.document.querySelectorAll(".trip-chat-actions button");
-              assert(assistant.textContent.includes("I found a stay") && actions.length === 1 && actions[0].dataset.openOffering === "stay-1", "A matching stay should produce a booking action");
+              assert(assistant.textContent.includes("I found a stay") && actions.length === 1 && actions[0].dataset.bookOffering === "stay-1", "A matching stay should produce a chat booking action");
               actions[0].click();
-              assert(chatWindow.GatherChatBookingPreferences && !chatWindow.GatherChatBookingPreferences.dates, "The booking action should carry any chat preferences into the booking flow");
+              await new Promise((resolve) => setTimeout(resolve, 0));
+              assert(chatWindow.document.querySelector(".trip-chat-message.assistant:last-child").textContent.includes("check-in and check-out dates"), "Selecting a stay should continue the booking conversation in chat");
+              const checkin = api.addDays(api.toDateString(new Date()), 10);
+              const checkout = api.addDays(checkin, 2);
+              await send(`${checkin} to ${checkout}`);
+              await send("2 guests");
+              const confirmButton = Array.from(chatWindow.document.querySelectorAll(".trip-chat-actions button")).find((button) => button.textContent.includes("Confirm booking"));
+              assert(confirmButton, "A complete chat booking should offer an explicit confirmation action");
+              let confirmedDetails = null;
+              chatWindow.GatherChatActions = {
+                confirmBooking: async (details) => {
+                  confirmedDetails = details;
+                  return { offeringName: "Siargao Stay", nights: 2 };
+                }
+              };
+              confirmButton.click();
+              await new Promise((resolve) => setTimeout(resolve, 0));
+              assert(confirmedDetails && confirmedDetails.offeringId === "stay-1" && confirmedDetails.checkin === checkin && confirmedDetails.guests === 2, "Confirmation should submit the exact details collected in chat");
+              assert(chatWindow.document.querySelector(".trip-chat-message.assistant:last-child").textContent.includes("is booked"), "A successful booking should return a chat confirmation");
               await send("I want to list my property");
               await send("Island home");
               await send("Siargao");
