@@ -21,7 +21,7 @@
         <div class="header-actions">
           <button class="nav-link host-link" type="button" data-tab-link="manage">List your property <span aria-hidden="true">↗</span></button>
           <button type="button" class="profile-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown"><span class="profile-dot" aria-hidden="true">G</span><span id="account-button-label">Sign in</span></button>
-          <button type="button" class="feature-guide-trigger" data-tab-link="guide" aria-label="Explore everything in Gather" title="Explore everything in Gather">▦</button>
+          <button type="button" class="feature-guide-trigger" data-tab-link="guide" aria-label="Open presenter notes" title="Open presenter notes"><span aria-hidden="true">▦</span> Tour</button>
         </div>
       </header>
       <aside class="demo-mode-notice" aria-label="Presentation demo notice">
@@ -124,11 +124,14 @@
               <div class="stay-results-column">
                 <div class="sort-control"><span>Sort by</span><div class="sort-options" id="sort-options" role="group" aria-label="Sort stays"><button type="button" class="sort-option selected" data-sort="recommended" aria-pressed="true">Gather picks</button><button type="button" class="sort-option" data-sort="price" aria-pressed="false">Lowest price</button><button type="button" class="sort-option" data-sort="rating" aria-pressed="false">Top rated</button><button type="button" class="sort-option" data-sort="reviews" aria-pressed="false">Most reviewed</button></div></div>
                 <div class="category-row" id="category-filters" aria-label="Filter by stay type"></div>
-                <div class="comparison-filters">
-                  <label class="range-filter"><span>Price per night up to <strong id="max-price-label">₱50,000</strong></span><input id="max-price-filter" type="range" min="1000" max="50000" step="500" value="50000"></label>
-                  <label class="rating-filter"><span>Guest rating</span><select id="min-rating-filter"><option value="0">Any rating</option><option value="4">4+ Very good</option><option value="4.5">4.5+ Wonderful</option><option value="4.8">4.8+ Exceptional</option></select></label>
-                  <span class="comparison-note"><span aria-hidden="true">ⓘ</span> Demo stays, prices &amp; ratings. No live hotel-provider rates.</span>
-                </div>
+                <details class="filter-disclosure">
+                  <summary>More filters <span>Budget, guest rating &amp; demo details</span></summary>
+                  <div class="comparison-filters">
+                    <label class="range-filter"><span>Price per night up to <strong id="max-price-label">₱50,000</strong></span><input id="max-price-filter" type="range" min="1000" max="50000" step="500" value="50000"></label>
+                    <label class="rating-filter"><span>Guest rating</span><select id="min-rating-filter"><option value="0">Any rating</option><option value="4">4+ Very good</option><option value="4.5">4.5+ Wonderful</option><option value="4.8">4.8+ Exceptional</option></select></label>
+                    <span class="comparison-note"><span aria-hidden="true">ⓘ</span> Demo stays, prices &amp; ratings. No live hotel-provider rates.</span>
+                  </div>
+                </details>
                 <div class="result-summary"><span id="results-count"></span><span id="results-dates"></span></div>
                 <div class="offering-grid" id="offering-grid" aria-live="polite"></div>
                 <div class="empty-state hidden" id="empty-offerings"><span class="empty-icon" aria-hidden="true">⌕</span><h3>No places for those dates</h3><p>Try a different destination, guest count, or check-in date.</p><button class="button button-outline" id="clear-filters" type="button">Clear filters</button></div>
@@ -157,49 +160,50 @@
 
         <section class="view feature-guide-view" id="guide-view" aria-labelledby="guide-title" hidden>
           <div class="feature-guide-intro">
-            <p class="eyebrow">A QUICK TOUR OF GATHER</p>
-            <h1 id="guide-title">Everything, <em>in one place.</em></h1>
-            <p>Open a section to see what you can do. Each card takes you straight to that part of Gather.</p>
+            <p class="eyebrow">PRESENTER NOTES · A QUICK TOUR</p>
+            <h1 id="guide-title">What Gather <em>can do.</em></h1>
+            <p>Use this written outline while presenting. Each section expands for a short feature summary, and links jump to the matching part of the demo.</p>
           </div>
           <div class="feature-guide-groups">
             <details class="feature-guide-group" open>
-              <summary><span class="guide-summary-icon" aria-hidden="true">⌕</span><span class="guide-summary-copy"><strong>Find your next stay</strong><small>Explore destinations, compare places, and save favourites</small></span><span class="guide-count">6 features</span></summary>
-              <div class="guide-card-grid">
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">⌕</span><h2>Search by your plans</h2><p>Look by Philippine destination, check-in and check-out dates, and guest count—including groups of up to 20.</p><a href="#search" data-tab-link="search">Start a search <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">✦</span><h2>Browse destinations</h2><p>Discover stays across islands, coastlines, cities, mountain escapes, heritage towns, and more.</p><a href="#search" data-tab-link="search">Explore destinations <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">☷</span><h2>Filter and compare</h2><p>Sort Gather picks by price, rating, or reviews. Narrow the results by stay type, nightly budget, and guest rating.</p><a href="#search" data-tab-link="search">Compare stays <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">♡</span><h2>Keep favourite places</h2><p>Save stays to your account and filter your search to see your favourites together.</p><a href="#search" data-tab-link="search">Find a favourite <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card guide-card-map"><span class="guide-card-icon" aria-hidden="true">⌖</span><h2>Explore the interactive map</h2><p>See approximate stay locations on the Philippines map. Click a marker to open a place, or expand the map for a closer look.</p><a href="#search" data-tab-link="search" data-scroll-target="stay-map" data-expand-map="true">Open and expand map <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">▧</span><h2>See the details</h2><p>Open a stay to review its description, amenities, guest capacity, nightly price, and date options before booking.</p><a href="#search" data-tab-link="search">View available stays <span aria-hidden="true">→</span></a></article>
-              </div>
+              <summary><span class="guide-summary-copy"><strong>Finding and exploring stays</strong><small>Search tools, destinations, comparison, favourites, and the map</small></span><span class="guide-count">6 talking points</span></summary>
+              <ul class="guide-script-list">
+                <li><span><strong>Search:</strong> Find a stay by Philippine destination, check-in and check-out dates, and group size, including up to 20 guests.</span><a href="#search" data-tab-link="search">Show search</a></li>
+                <li><span><strong>Destinations:</strong> Browse featured places and stays across island, beach, city, mountain, heritage, farm, and nature categories.</span><a href="#search" data-tab-link="search">Browse stays</a></li>
+                <li><span><strong>Compare:</strong> Sort by Gather picks, price, guest rating, or reviews. Filter by stay type, nightly budget, and minimum rating.</span><a href="#search" data-tab-link="search">Show filters</a></li>
+                <li><span><strong>Stay details:</strong> Open a stay to review its description, amenities, capacity, sample price, and booking dates.</span><a href="#search" data-tab-link="search">Open stay search</a></li>
+                <li><span><strong>Favourites:</strong> Signed-in guests can save places and filter to see saved stays together.</span><a href="#search" data-tab-link="search">Show stays</a></li>
+                <li><span><strong>Interactive map:</strong> Markers show approximate stay locations. Click a marker for stay details; expand the map to explore the Philippines more easily.</span><a href="#search" data-tab-link="search" data-scroll-target="stay-map" data-expand-map="true">Open expanded map</a></li>
+              </ul>
             </details>
             <details class="feature-guide-group">
-              <summary><span class="guide-summary-icon" aria-hidden="true">✓</span><span class="guide-summary-copy"><strong>Plan and manage trips</strong><small>Check availability, confirm a stay, and review your bookings</small></span><span class="guide-count">3 features</span></summary>
-              <div class="guide-card-grid">
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">◷</span><h2>Check dates and availability</h2><p>Gather checks dates, capacity, minimum nights, and overlapping reservations before preparing a booking.</p><a href="#search" data-tab-link="search">Check a stay <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">₱</span><h2>Review the booking total</h2><p>See the nightly price, number of nights, and total before you decide. Nothing is saved until you explicitly confirm.</p><a href="#search" data-tab-link="search">Choose a place <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">▤</span><h2>View and manage your trips</h2><p>See your booking details and status in My trips. Cancel eligible demo reservations to release those dates.</p><a href="#bookings" data-tab-link="bookings">Open My trips <span aria-hidden="true">→</span></a></article>
-              </div>
+              <summary><span class="guide-summary-copy"><strong>Booking and managing trips</strong><small>Availability checks, booking confirmation, and My trips</small></span><span class="guide-count">3 talking points</span></summary>
+              <ul class="guide-script-list">
+                <li><span><strong>Availability:</strong> Gather checks guest capacity, check-in rules, minimum nights, and overlapping bookings before preparing a reservation.</span><a href="#search" data-tab-link="search">Choose a stay</a></li>
+                <li><span><strong>Booking confirmation:</strong> Review dates, guests, and the total price first. A booking is only saved after the guest explicitly confirms.</span><a href="#search" data-tab-link="search">Start a booking</a></li>
+                <li><span><strong>My trips:</strong> Guests can review their booking details and status, and cancel eligible demo reservations.</span><a href="#bookings" data-tab-link="bookings">Open My trips</a></li>
+              </ul>
             </details>
             <details class="feature-guide-group">
-              <summary><span class="guide-summary-icon" aria-hidden="true">⌂</span><span class="guide-summary-copy"><strong>Host a place</strong><small>Create a listing and manage availability and reservations</small></span><span class="guide-count">4 features</span></summary>
-              <div class="guide-card-grid">
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">＋</span><h2>Create a property listing</h2><p>Add a place name, category, location, capacity, nightly price, description, photo, and amenities.</p><a href="#manage" data-tab-link="manage">Go to host tools <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">⌖</span><h2>Pin an approximate location</h2><p>Choose your place on the Philippines map or enter its coordinates for an approximate public map marker.</p><a href="#manage" data-tab-link="manage">Open host tools <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">▦</span><h2>Set availability</h2><p>Choose available check-in days and minimum nights, then update listing details as your place changes.</p><a href="#manage" data-tab-link="manage">Manage availability <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">☷</span><h2>Review guest reservations</h2><p>Manage your hosted listings and see guest reservations associated with your places.</p><a href="#manage" data-tab-link="manage">View host dashboard <span aria-hidden="true">→</span></a></article>
-              </div>
+              <summary><span class="guide-summary-copy"><strong>Hosting a place</strong><small>Listings, approximate map locations, availability, and reservations</small></span><span class="guide-count">4 talking points</span></summary>
+              <ul class="guide-script-list">
+                <li><span><strong>Create a listing:</strong> Hosts can add a place name, category, description, guest capacity, nightly price, amenities, and photos.</span><a href="#manage" data-tab-link="manage">Open host tools</a></li>
+                <li><span><strong>Set the location:</strong> Choose an approximate location on the Philippines map or provide coordinates for the public map marker.</span><a href="#manage" data-tab-link="manage">Show host tools</a></li>
+                <li><span><strong>Manage availability:</strong> Set eligible check-in days and the minimum stay, then edit your listing as needed.</span><a href="#manage" data-tab-link="manage">Manage a place</a></li>
+                <li><span><strong>Review reservations:</strong> Hosts can see the places they manage and guest bookings associated with their listings.</span><a href="#manage" data-tab-link="manage">Open host dashboard</a></li>
+              </ul>
             </details>
             <details class="feature-guide-group">
-              <summary><span class="guide-summary-icon" aria-hidden="true">✳</span><span class="guide-summary-copy"><strong>Get help from Gather</strong><small>Chat with the booking agent and learn about this presentation</small></span><span class="guide-count">3 features</span></summary>
-              <div class="guide-card-grid">
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">g</span><h2>Chat with the AI booking agent</h2><p>Ask naturally for Philippine stay ideas, get suggestions from Gather’s listings, or prepare a listing draft.</p><a href="#home" data-tab-link="home" data-scroll-target="trip-chat">Open Gather chat <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">◉</span><h2>Use a guest or host demo account</h2><p>Try the presentation with demo guest or host access. Sign-in requirements and available features depend on your account.</p><a href="#home" data-tab-link="home">Return to Gather <span aria-hidden="true">→</span></a></article>
-                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">ⓘ</span><h2>Know what is a demo</h2><p>Listings, prices, availability, and bookings are examples; Gather does not reserve real accommodation or process payments.</p><button type="button" class="guide-text-button" id="guide-demo-details">Read demo details <span aria-hidden="true">→</span></button></article>
-              </div>
+              <summary><span class="guide-summary-copy"><strong>AI help and presentation notes</strong><small>Conversational trip help, demo access, and important limitations</small></span><span class="guide-count">4 talking points</span></summary>
+              <ul class="guide-script-list">
+                <li><span><strong>AI booking agent:</strong> Ask for recommendations using Gather’s listed stays, discuss trip details, or prepare a host listing draft.</span><a href="#home" data-tab-link="home" data-scroll-target="trip-chat">Open Gather chat</a></li>
+                <li><span><strong>Booking with AI:</strong> The assistant can collect dates and guest count, but Gather checks availability and still asks the guest to confirm before saving.</span><a href="#home" data-tab-link="home" data-scroll-target="trip-chat">Show the assistant</a></li>
+                <li><span><strong>Demo access:</strong> Use guest or host demo access to try the matching experience and tools.</span><a href="#home" data-tab-link="home">Return to Gather</a></li>
+                <li><span><strong>Demo limitations:</strong> Listings, prices, ratings, availability, and bookings are examples. The site does not reserve real accommodation or process payments.</span><button type="button" class="guide-text-button" id="guide-demo-details">Read the demo note</button></li>
+              </ul>
             </details>
           </div>
-          <p class="feature-guide-note">Gather is a Philippines-focused booking experience. Stay information and reservations in this presentation are examples, not live travel offers.</p>
+          <p class="feature-guide-note"><strong>Short intro to read aloud:</strong> “Gather is a Philippines-focused stay-booking demo. Guests can explore stays, check dates, and review a booking before confirming. Hosts can manage sample listings and availability. The map is clickable and expandable, and the AI assistant helps people explore the demo.”</p>
         </section>
       </main>
     </div>

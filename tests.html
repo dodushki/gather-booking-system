@@ -169,9 +169,11 @@
             assert(dataScript.includes("functions/v1/gather-chat") && !markup.includes("GATHER_AI_API_KEY"), "The AI provider secret must stay on the server and never appear in the website");
             assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes("window.GatherChatBookingPreferences") && appScript.includes("GatherChatActions"), "Assistant actions should connect to Gather’s booking and editable listing flows");
             assert(styles.includes(".trip-chat {") && styles.includes(".trip-chat-form { grid-template-columns: 1fr; }"), "The assistant should remain usable on mobile-sized screens");
-            assert(markup.includes('id="guide-view"') && markup.includes('class="feature-guide-trigger"') && markup.includes("<details class=\"feature-guide-group\""), "The quiet top-corner feature guide should provide expandable sections");
-            assert(markup.includes('data-scroll-target="stay-map"') && markup.includes('data-expand-map="true"') && appScript.includes('"guide"].includes(initialRoute)'), "The feature guide should link to and expand the interactive map, and its route should be shareable");
-            assert(styles.includes("feature-guide-view") && styles.includes("--green: #28796b") && styles.includes("--sans:"), "The feature guide and refreshed color and typography system should be styled");
+            assert(markup.includes('id="guide-view"') && markup.includes('class="feature-guide-trigger"') && markup.includes("<ul class=\"guide-script-list\""), "The discreet Tour button should open expandable presenter notes in text-list form");
+            assert(markup.includes('data-scroll-target="stay-map"') && markup.includes('data-expand-map="true"') && markup.includes('Short intro to read aloud'), "Presenter notes should include a clickable expanded-map shortcut and read-aloud introduction");
+            assert(styles.includes("feature-guide-view") && styles.includes("--green: #28796b") && styles.includes("--sans:"), "The presenter guide and refreshed color and typography system should be styled");
+            assert(markup.includes('<details class="filter-disclosure">') && markup.includes("Budget, guest rating &amp; demo details") && markup.includes('id="max-price-filter"') && markup.includes('id="min-rating-filter"'), "Find stays should keep budget and rating filters available in a compact disclosure");
+            assert(styles.includes(".stay-results-column { min-width: 0; }") && styles.includes("position: sticky; top: 92px") && styles.includes("order: 2") && styles.includes("category-row::-webkit-scrollbar { display: none; }"), "Find stays should avoid nested scrolling, keep the desktop map visible, and present a clean category rail");
           });
           await testAsync("streams real AI replies through the authenticated Supabase proxy", async function () {
             const source = await (await fetch("./supabase-data.js")).text();
