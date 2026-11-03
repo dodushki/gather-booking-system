@@ -51,13 +51,16 @@ create table if not exists public.bookings (
   guest_name text not null,
   guest_email text,
   notes text not null default '',
-  status text not null default 'confirmed' check (status in ('confirmed', 'cancelled')),
+  status text not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled')),
   created_at timestamptz not null default now(),
   check (checkout > checkin),
   check (nights = checkout - checkin),
   check (total = price * nights)
 );
 
+alter table public.bookings drop constraint if exists bookings_status_check;
+alter table public.bookings
+  add constraint bookings_status_check check (status in ('pending', 'confirmed', 'cancelled'));
 alter table public.bookings alter column offering_id drop not null;
 alter table public.profiles alter column email drop not null;
 alter table public.bookings alter column guest_email drop not null;
@@ -227,6 +230,9 @@ declare
   v_booking public.bookings;
 begin
   if v_user_id is null then raise exception 'Sign in to reserve a stay.'; end if;
+  if coalesce((auth.jwt()->>'is_anonymous')::boolean, false) then
+    raise exception 'Create or sign in to a Gather account to request a stay.';
+  end if;
   select * into v_profile from public.profiles where id = v_user_id;
   if not found then raise exception 'Your Gather profile could not be found.'; end if;
   select * into v_offering from public.offerings where id = p_offering_id for share;
@@ -252,12 +258,12 @@ begin
 
   insert into public.bookings (
     offering_id, guest_id, host_id, offering_name, category, location, image,
-    checkin, checkout, nights, guests, price, total, guest_name, guest_email, notes
+    checkin, checkout, nights, guests, price, total, guest_name, guest_email, notes, status
   ) values (
     v_offering.id, v_user_id, v_offering.owner_id, v_offering.name, v_offering.category,
     v_offering.location, v_offering.image, p_checkin, p_checkout, v_nights,
     p_guests, v_offering.price, v_offering.price * v_nights, v_profile.name,
-    v_profile.email, left(coalesce(p_notes, ''), 400)
+    v_profile.email, left(coalesce(p_notes, ''), 400), 'pending'
   ) returning * into v_booking;
   return v_booking;
 end;
@@ -274,7 +280,7 @@ declare
 begin
   update public.bookings
   set status = 'cancelled'
-  where id = p_booking_id and guest_id = auth.uid() and status = 'confirmed'
+  where id = p_booking_id and guest_id = auth.uid() and status in ('pending', 'confirmed')
   returning * into v_booking;
   if not found then raise exception 'This reservation could not be cancelled.'; end if;
   return v_booking;
@@ -296,7 +302,7 @@ begin
   end if;
   update public.bookings
   set status = 'cancelled'
-  where offering_id = p_offering_id and status = 'confirmed';
+  where offering_id = p_offering_id and status in ('pending', 'confirmed');
   delete from public.offerings where id = p_offering_id and owner_id = auth.uid();
 end;
 $$;
@@ -345,5 +351,31 @@ insert into public.offerings (
   ('luntian-city-hotel', 'Luntian City Hotel', 'City hotels', 'A calm, leafy hideaway in the middle of Makati, close to galleries, cafés, and the business district.', 'Makati City, Metro Manila, Philippines', 14.5547, 121.0244, 5200, 4.6, 318, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'City favorite', array['Rooftop pool','Breakfast','Wi-Fi'], array[0,1,2,3,4,5,6]::smallint[], 1),
   ('bgc-serviced-suite', 'BGC Garden Suite', 'Serviced apartments', 'A light-filled apartment with room to settle in, steps from parks, restaurants, and city life.', 'Bonifacio Global City, Taguig, Philippines', 14.5502, 121.0497, 6100, 4.7, 142, 3, 1, 1, '⌂', 'assets/stays/bgc-burgos-circle.jpg', 'Room to settle in', array['Kitchen','Work desk','City view'], array[0,1,2,3,4,5,6]::smallint[], 1),
   ('vigan-heritage-inn', 'Casa de Abel Heritage Inn', 'Heritage inns', 'Stay in a lovingly restored Vigan home, with a quiet courtyard just off the cobbled old town.', 'Vigan City, Ilocos Sur, Philippines', 17.5747, 120.3869, 3900, 4.8, 94, 2, 1, 1, '⌂', 'assets/stays/vigan-calle-crisologo.jpg', 'A heritage hideaway', array['Heritage home','Courtyard','Breakfast'], array[0,1,2,3,4,5,6]::smallint[], 1),
-  ('tagaytay-farmstay', 'Hapag Farm Stay', 'Farm stays', 'Slow mornings, garden-to-table meals, and cool countryside air with a view of Taal.', 'Tagaytay, Cavite, Philippines', 14.1153, 120.9621, 4800, 4.8, 76, 4, 2, 1, '♧', 'assets/stays/tagaytay-taal.jpg', 'Countryside favorite', array['Garden','Farm breakfast','Taal view'], array[0,1,2,3,4,5,6]::smallint[], 1)
+  ('tagaytay-farmstay', 'Hapag Farm Stay', 'Farm stays', 'Slow mornings, garden-to-table meals, and cool countryside air with a view of Taal.', 'Tagaytay, Cavite, Philippines', 14.1153, 120.9621, 4800, 4.8, 76, 4, 2, 1, '♧', 'assets/stays/tagaytay-taal.jpg', 'Countryside favorite', array['Garden','Farm breakfast','Taal view'], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('peninsula-makati', 'Dusit Thani Manila', 'City hotels', 'A hotel in Makati''s central business district. Send a request to check current room availability and terms.', 'Makati City, Metro Manila, Philippines', 14.5526, 121.0224, 12000, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Makati', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('manila-hotel-ermita', 'The Manila Hotel', 'Heritage hotels', 'A hotel by Manila Bay and Rizal Park. Send a request to check current room availability and terms.', 'Ermita, Manila, Philippines', 14.5821, 120.9747, 10000, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Manila', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('okada-manila', 'Okada Manila', 'City hotels', 'A hotel and resort complex in Entertainment City. Send a request to check current room availability and terms.', 'Parañaque City, Metro Manila, Philippines', 14.5143, 120.9822, 19000, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Parañaque', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('discovery-shores-boracay', 'Discovery Shores Boracay', 'Beach resorts', 'A resort on Boracay''s White Beach. Send a request to check current room availability and terms.', 'Boracay Island, Aklan, Philippines', 11.9718, 121.9185, 22000, 4.6, 0, 2, 1, 1, '❋', 'assets/stays/alona-beach-panglao.jpg', 'Explore Boracay', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('amorita-bohol', 'Amorita Resort', 'Beach resorts', 'A resort above Alona Beach on Panglao Island. Send a request to check current room availability and terms.', 'Panglao Island, Bohol, Philippines', 9.5454, 123.7726, 19000, 4.6, 0, 2, 1, 1, '❋', 'assets/stays/alona-beach-panglao.jpg', 'Explore Panglao', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('bohol-beach-club', 'Bohol Beach Club', 'Beach resorts', 'A beachfront resort on Panglao Island. Send a request to check current room availability and terms.', 'Panglao Island, Bohol, Philippines', 9.5718, 123.7740, 11000, 4.6, 0, 2, 1, 1, '❋', 'assets/stays/alona-beach-panglao.jpg', 'Explore Panglao', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('shangri-la-mactan', 'Shangri-La Mactan, Cebu', 'Beach resorts', 'A resort on Mactan Island. Send a request to check current room availability and terms.', 'Lapu-Lapu City, Cebu, Philippines', 10.3090, 124.0160, 22000, 4.6, 0, 2, 1, 1, '❋', 'assets/stays/alona-beach-panglao.jpg', 'Explore Cebu', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('radisson-blu-cebu', 'Radisson Blu Cebu', 'City hotels', 'A hotel near Cebu City''s North Reclamation Area. Send a request to check current room availability and terms.', 'Cebu City, Cebu, Philippines', 10.3110, 123.9180, 9000, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Cebu City', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('seda-cebu', 'Seda Ayala Center Cebu', 'City hotels', 'A hotel in Cebu City''s Cebu Business Park. Send a request to check current room availability and terms.', 'Cebu City, Cebu, Philippines', 10.3170, 123.9060, 7500, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Cebu City', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('anya-tagaytay', 'Anya Resort Tagaytay', 'Nature retreats', 'A resort in Tagaytay. Send a request to check current room availability and terms.', 'Tagaytay, Cavite, Philippines', 14.1070, 120.9540, 17000, 4.6, 0, 2, 1, 1, '♧', 'assets/stays/tagaytay-taal.jpg', 'Explore Tagaytay', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('lagen-island-el-nido', 'El Nido Resorts Lagen Island', 'Island resorts', 'A resort on Lagen Island in El Nido. Send a request to check current room availability and terms.', 'El Nido, Palawan, Philippines', 11.1990, 119.4070, 40000, 4.6, 0, 2, 1, 1, '〰', 'assets/stays/coron-twin-lagoon.jpg', 'Explore El Nido', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('dusit-davao', 'Dusit Thani Residence Davao', 'City hotels', 'A hotel in Davao City''s Lanang district. Send a request to check current room availability and terms.', 'Davao City, Philippines', 7.0880, 125.6100, 12000, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Davao', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('seda-centrio-cdo', 'Seda Centrio', 'City hotels', 'A hotel in Cagayan de Oro''s Centrio district. Send a request to check current room availability and terms.', 'Cagayan de Oro, Philippines', 8.4830, 124.6480, 6500, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Cagayan de Oro', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('richmonde-iloilo', 'Richmonde Hotel Iloilo', 'City hotels', 'A hotel in Iloilo City''s Iloilo Business Park. Send a request to check current room availability and terms.', 'Iloilo City, Philippines', 10.7180, 122.5530, 7000, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Iloilo', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('las-casas-bataan', 'Las Casas Filipinas de Acuzar', 'Heritage hotels', 'A heritage resort in Bagac, Bataan. Send a request to check current room availability and terms.', 'Bagac, Bataan, Philippines', 14.7920, 120.5390, 12000, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/vigan-calle-crisologo.jpg', 'Explore Bataan', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('crimson-filinvest', 'Crimson Hotel Filinvest City', 'City hotels', 'A hotel in Filinvest City, Alabang. Send a request to check current room availability and terms.', 'Muntinlupa City, Metro Manila, Philippines', 14.4180, 121.0400, 8500, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Alabang', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1),
+  ('belmont-manila', 'Belmont Hotel Manila', 'City hotels', 'A hotel in Newport City, near Manila''s airport. Send a request to check current room availability and terms.', 'Pasay City, Metro Manila, Philippines', 14.5190, 121.0190, 7500, 4.6, 0, 2, 1, 1, '⌂', 'assets/stays/makati-skyline.jpg', 'Explore Pasay', array[]::text[], array[0,1,2,3,4,5,6]::smallint[], 1)
 on conflict (id) do nothing;
+
+update public.offerings set name = 'Isla Cabana Resort', category = 'Beach resorts', description = 'A resort in General Luna, Siargao. Send a request to check current room availability and terms.', location = 'General Luna, Siargao, Philippines', latitude = 9.7802, longitude = 126.1583, price = 9000, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Siargao', amenities = array[]::text[], minimum_nights = 1 where id = 'isla-norte' and owner_id is null;
+update public.offerings set name = 'The Manor at Camp John Hay', category = 'Mountain hotels', description = 'A hotel in Baguio''s Camp John Hay. Send a request to check current room availability and terms.', location = 'Baguio City, Benguet, Philippines', latitude = 16.4023, longitude = 120.6091, price = 11000, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Baguio', amenities = array[]::text[], minimum_nights = 1 where id = 'amihan-cabin' and owner_id is null;
+update public.offerings set name = 'Henann Resort Alona Beach', category = 'Beach resorts', description = 'A resort on Panglao Island. Send a request to check current room availability and terms.', location = 'Panglao Island, Bohol, Philippines', latitude = 9.5500, longitude = 123.7720, price = 11000, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Bohol', amenities = array[]::text[], minimum_nights = 1 where id = 'bahay-tala' and owner_id is null;
+update public.offerings set name = 'Two Seasons Coron Island Resort', category = 'Island resorts', description = 'A resort on Coron Island. Send a request to check current room availability and terms.', location = 'Coron, Palawan, Philippines', latitude = 11.9360, longitude = 120.2260, price = 26000, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Palawan', amenities = array[]::text[], minimum_nights = 1 where id = 'coron-cove' and owner_id is null;
+update public.offerings set name = 'The Peninsula Manila', category = 'City hotels', description = 'A hotel in Makati''s central business district. Send a request to check current room availability and terms.', location = 'Makati City, Metro Manila, Philippines', latitude = 14.5547, longitude = 121.0244, price = 18000, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Manila', amenities = array[]::text[], minimum_nights = 1 where id = 'luntian-city-hotel' and owner_id is null;
+update public.offerings set name = 'Shangri-La The Fort, Manila', category = 'City hotels', description = 'A hotel in Bonifacio Global City. Send a request to check current room availability and terms.', location = 'Bonifacio Global City, Taguig, Philippines', latitude = 14.5502, longitude = 121.0497, price = 19000, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Taguig', amenities = array[]::text[], minimum_nights = 1 where id = 'bgc-serviced-suite' and owner_id is null;
+update public.offerings set name = 'Hotel Luna', category = 'Heritage hotels', description = 'A hotel in the historic center of Vigan. Send a request to check current room availability and terms.', location = 'Vigan City, Ilocos Sur, Philippines', latitude = 17.5747, longitude = 120.3869, price = 8500, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Vigan', amenities = array[]::text[], minimum_nights = 1 where id = 'vigan-heritage-inn' and owner_id is null;
+update public.offerings set name = 'Taal Vista Hotel', category = 'Mountain hotels', description = 'A hotel in Tagaytay. Send a request to check current room availability and terms.', location = 'Tagaytay, Cavite, Philippines', latitude = 14.1153, longitude = 120.9621, price = 9500, rating = 4.6, reviews = 0, guests = 2, bedrooms = 1, bathrooms = 1, badge = 'Explore Tagaytay', amenities = array[]::text[], minimum_nights = 1 where id = 'tagaytay-farmstay' and owner_id is null;

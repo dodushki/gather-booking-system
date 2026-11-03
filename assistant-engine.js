@@ -4,13 +4,11 @@
   if (root) root.GatherAssistant = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function (root) {
   const categoryCues = [
-    { category: "Beachfront stays", cues: ["beachfront", "beach house", "oceanfront", "seaside", "by the sea", "shore"] },
-    { category: "Island stays", cues: ["island", "surf", "snorkel", "diving", "lagoon", "siargao", "coron", "palawan"] },
-    { category: "Mountain escapes", cues: ["mountain", "highland", "hiking", "hike", "pine", "cool weather", "baguio", "cabin"] },
+    { category: "Beach resorts", cues: ["beach", "beachfront", "beach house", "oceanfront", "seaside", "by the sea", "shore"] },
+    { category: "Island resorts", cues: ["island", "surf", "snorkel", "diving", "lagoon", "siargao", "coron", "palawan"] },
+    { category: "Mountain hotels", cues: ["mountain", "highland", "hiking", "hike", "pine", "cool weather", "baguio", "cabin"] },
     { category: "City hotels", cues: ["city hotel", "hotel", "city break", "nightlife", "shopping", "manila", "makati"] },
-    { category: "Serviced apartments", cues: ["apartment", "suite", "serviced apartment", "work desk"] },
-    { category: "Heritage inns", cues: ["heritage", "historic", "history", "old town", "vigan", "culture"] },
-    { category: "Farm stays", cues: ["farm", "countryside", "rural", "tagaytay", "taal"] },
+    { category: "Heritage hotels", cues: ["heritage", "historic", "history", "old town", "vigan", "culture"] },
     { category: "Nature retreats", cues: ["nature", "forest", "retreat"] }
   ];
   const genericLocationWords = new Set(["philippines", "pilipinas", "city", "municipality", "province", "metro"]);
@@ -257,7 +255,7 @@
       }
       const nights = root.GatherBooking.getNights(bookingDraft.dates.checkin, bookingDraft.dates.checkout);
       return {
-        reply: `I can book ${selectedOffering.name} in ${selectedOffering.location} for ${bookingDraft.guests} ${bookingDraft.guests === 1 ? "guest" : "guests"}, ${nights} ${nights === 1 ? "night" : "nights"} (${bookingDraft.dates.checkin} to ${bookingDraft.dates.checkout}). The total is ₱${(Number(selectedOffering.price) * nights).toLocaleString("en-PH")}. Select Confirm booking to continue; Gather will ask you to confirm before saving.`,
+        reply: `I can save a booking request for ${selectedOffering.name} in ${selectedOffering.location} for ${bookingDraft.guests} ${bookingDraft.guests === 1 ? "guest" : "guests"}, ${nights} ${nights === 1 ? "night" : "nights"} (${bookingDraft.dates.checkin} to ${bookingDraft.dates.checkout}). The estimated total is ₱${(Number(selectedOffering.price) * nights).toLocaleString("en-PH")}. Select Request to book to review it; the request is not sent to or confirmed by the property, so contact them directly to verify availability and terms.`,
         stays: [],
         bookingReady: {
           offeringId: selectedOffering.id,

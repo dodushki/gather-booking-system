@@ -82,18 +82,18 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "button button-dark";
-      button.textContent = `Confirm booking · ₱${result.bookingReady.total.toLocaleString("en-PH")}`;
+      button.textContent = `Request to book · ₱${result.bookingReady.total.toLocaleString("en-PH")}`;
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
           const outcome = await window.GatherChatActions.confirmBooking(result.bookingReady);
           if (outcome.requiresSignIn) {
-            addMessage("assistant", "Please sign in or continue as a demo guest to finish. Gather has carried your selected stay and dates into the booking form.");
+            addMessage("assistant", "Please create or sign in to a Gather account to send this request. Your selected stay and dates are ready in the booking form.");
           } else if (outcome.cancelled) {
             addMessage("assistant", "No booking was made. Your stay details are still here if you’d like to confirm later.");
             button.disabled = false;
           } else {
-            addMessage("assistant", `Your ${outcome.nights}-night stay at ${outcome.offeringName} is booked. You can review it in My bookings.`);
+            addMessage("assistant", `Your ${outcome.nights}-night request for ${outcome.offeringName} was saved in Gather. It is not sent to or confirmed by the property; contact them directly to verify availability and terms. You can review its status in My trips.`);
           }
         } catch (error) {
           console.error("Gather could not complete the chat booking.", error);

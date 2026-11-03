@@ -5,8 +5,6 @@
   const state = Booking.createInitialState();
   state.unavailableDates = [];
   let currentUser = null;
-  let welcomeGateRequired = true;
-  let isInitializing = true;
   let sharedServiceError = null;
   const $ = (selector, scope) => (scope || document).querySelector(selector);
   const $$ = (selector, scope) => Array.from((scope || document).querySelectorAll(selector));
@@ -16,6 +14,7 @@
   let selectedCategory = "All stays";
   let searchTerm = "";
   let sortMode = "recommended";
+  let resultsViewMode = "list";
   let maxPrice = 50000;
   let minRating = 0;
   let searchCheckin = minDate;
@@ -46,6 +45,7 @@
   let listingImagePreviewUrl = null;
   let countryBoundary = null;
   let mapPopupCloseTimer = null;
+  let scrollRevealObserver = null;
   let mappedMapOfferings = [];
   const stayMarkers = new Map();
   const philippinesBounds = [[4, 115], [22, 128]];
@@ -55,6 +55,9 @@
     bookingList: $("#booking-list"), manageOfferings: $("#manage-offerings"),
     modal: $("#booking-modal"), modalContent: $("#modal-content"), toast: $("#toast")
   };
+  if (window.sessionStorage.getItem("gather-booking-disclaimer-accepted") === "true") {
+    elements.welcomeGate.classList.add("hidden");
+  }
   const searchForms = $$(".stay-search-form");
 
   function syncSearchForms() {
@@ -117,104 +120,23 @@
     toastTimer = window.setTimeout(() => elements.toast.classList.remove("visible"), 3000);
   }
 
-  function updateWelcomeGate() {
-    const continueButton = $("#welcome-continue-session");
-    const hasSession = Boolean(currentUser);
-    const switchAccountButton = $("#welcome-switch-account");
-    continueButton.classList.remove("hidden");
-    continueButton.disabled = isInitializing;
-    switchAccountButton.classList.toggle("hidden", !hasSession);
-    switchAccountButton.disabled = isInitializing;
-    continueButton.innerHTML = hasSession
-      ? `Continue as ${escapeHtml(currentUser.name)} <span aria-hidden="true">→</span>`
-      : 'Continue to sign in <span aria-hidden="true">→</span>';
-    $("#welcome-status").textContent = isInitializing
-      ? "Connecting to Gather…"
-      : sharedServiceError
-        ? `Gather is temporarily unavailable: ${sharedServiceError}`
-        : hasSession
-          ? `Welcome back, ${currentUser.name}.`
-          : "Sign in or continue with a demo guest or host account.";
-  }
-
   function showWelcomeGate() {
-    updateWelcomeGate();
-    elements.appShell.inert = true;
-    elements.appShell.setAttribute("aria-hidden", "true");
     elements.welcomeGate.classList.remove("hidden");
     document.body.classList.add("welcome-gate-open");
     window.requestAnimationFrame(() => {
       if (elements.welcomeGate.classList.contains("hidden")) return;
-      $("#welcome-continue-session").focus();
+      $("#welcome-dismiss").focus();
     });
   }
 
-  function showDemoDisclaimer() {
-    welcomeGateRequired = true;
+  function showBookingDisclaimer() {
     showWelcomeGate();
   }
 
   function dismissWelcomeGate() {
-    welcomeGateRequired = false;
     elements.welcomeGate.classList.add("hidden");
-    elements.appShell.inert = false;
-    elements.appShell.removeAttribute("aria-hidden");
     document.body.classList.remove("welcome-gate-open");
-  }
-
-  function continueFromWelcome() {
-    if (!currentUser) {
-      dismissWelcomeGate();
-      openAuthModal("signin", "guest", null);
-      return;
-    }
-    dismissWelcomeGate();
-    navigate(currentUser.role === "host" ? "manage" : "home", false);
-    showToast(`Welcome back, ${currentUser.name.split(/\s+/)[0]}.`);
-  }
-
-  async function switchAccountFromWelcome() {
-    if (!currentUser) {
-      dismissWelcomeGate();
-      openAuthModal("signin", "guest", null);
-      return;
-    }
-    try {
-      if (!await confirmAndEndSession()) return;
-      dismissWelcomeGate();
-      openAuthModal("signin", "guest", null);
-    } catch (error) {
-      console.error("Could not switch Gather accounts.", error);
-      showToast(`Could not sign out: ${error.message}`);
-    }
-  }
-
-  async function startGuestSession(nameInput, role, button, error) {
-    try {
-      if (authIntent && authIntent.type === "manage" && role !== "host") {
-        throw new Error("Choose the demo host option to create or manage property listings.");
-      }
-      const name = Booking.validateGuestName(nameInput);
-      error.classList.add("hidden");
-      button.disabled = true;
-      button.textContent = "Starting your demo session…";
-      const account = await GatherData.signInAnonymously(name, role);
-      await startSession(account);
-      welcomeGateRequired = false;
-      authIntent = null;
-      closeModal();
-      navigate(role === "host" ? "manage" : "home", false);
-      if (role === "host") openOfferingForm();
-      showToast(`Welcome, ${account.name.split(/\s+/)[0]}. Your demo ${role === "host" ? "host" : "guest"} session is ready.`);
-    } catch (caught) {
-      const message = /anonymous.*disabled|disabled.*anonymous/i.test(caught.message)
-        ? "Demo access is not enabled yet. In Supabase, open Authentication → Sign In / Providers and enable Anonymous Sign-Ins."
-        : caught.message;
-      error.textContent = message;
-      error.classList.remove("hidden");
-      button.disabled = false;
-      button.innerHTML = 'Continue as demo <span aria-hidden="true">→</span>';
-    }
+    window.sessionStorage.setItem("gather-booking-disclaimer-accepted", "true");
   }
 
   function requestConfirmation({ title, message, confirmLabel, danger }) {
@@ -309,17 +231,16 @@
     renderBookings();
     renderManager();
     navigate("home");
-    showWelcomeGate();
   }
 
   function signOutConfirmation() {
     if (!currentUser) return null;
     return {
-      title: currentUser.isAnonymous ? "End this demo session?" : "Sign out of Gather?",
+      title: currentUser.isAnonymous ? "End this guest session?" : "Sign out of Gather?",
       message: currentUser.isAnonymous
         ? currentUser.role === "host"
-          ? "This browser will lose access to your demo host session. Your listings and demo bookings will remain in shared Gather data, but you will no longer be able to manage those listings or view or cancel your bookings."
-          : "This browser will lose access to your guest trip list. Any demo bookings you made will remain in shared availability, but you will no longer be able to view or cancel them."
+          ? "This browser will lose access to your host session. Your listings and booking requests will remain saved, but you will no longer be able to manage those listings or view your requests."
+          : "This browser will lose access to your trip list. Your booking requests will remain saved, but you will no longer be able to view or cancel them."
         : "You’ll be signed out on this device. Your account, listings, and bookings will remain saved.",
       confirmLabel: "Sign out"
     };
@@ -345,7 +266,7 @@
     $(".profile-dot", button).textContent = currentUser.name.trim().charAt(0).toUpperCase();
     button.setAttribute("aria-label", `Account menu for ${currentUser.name}`);
     $("#account-dropdown").innerHTML = `
-      <div class="account-menu-heading"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><small>${currentUser.isAnonymous ? "Presentation session · no email collected" : escapeHtml(currentUser.email)}</small><span class="account-role">${currentUser.isAnonymous ? currentUser.role === "host" ? "GATHER DEMO HOST" : "GATHER DEMO GUEST" : currentUser.role === "host" ? "GATHER HOST" : "GATHER GUEST"}</span></div></div>
+      <div class="account-menu-heading"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><small>${currentUser.isAnonymous ? "Guest session" : escapeHtml(currentUser.email)}</small><span class="account-role">${currentUser.role === "host" ? "GATHER HOST" : "GATHER GUEST"}</span></div></div>
       <button type="button" class="account-menu-link" data-account-action="${currentUser.role === "host" ? "manage" : "bookings"}">${currentUser.role === "host" ? "Your host dashboard" : "Your trips"} <span>→</span></button>
       <button type="button" class="account-menu-link signout-link" data-account-action="signout">Sign out</button>`;
   }
@@ -366,33 +287,11 @@
         <button class="button button-dark auth-submit" type="submit">${isSignup ? "Create my account" : "Sign in"} <span aria-hidden="true">→</span></button>
       </form>
       <p class="auth-switch">${isSignup ? "Already have an account?" : "New to Gather?"} <button type="button" data-auth-mode="${isSignup ? "signin" : "signup"}" data-auth-role="${role}">${isSignup ? "Sign in" : "Create an account"}</button></p>
-      ${!isSignup ? `<section class="auth-demo-access" aria-labelledby="demo-access-title">
-        <h3 id="demo-access-title">Prefer to explore first?</h3>
-        <p>Try Gather without creating an email account. Choose how you’d like to use the demo.</p>
-        <form id="demo-access-form" class="auth-demo-form">
-          <label>Your name<input name="name" required minlength="2" maxlength="80" autocomplete="name" placeholder="Enter your name"></label>
-          <label>Use Gather as<select name="role"><option value="guest"${role === "guest" ? " selected" : ""}>Guest — find and book stays</option><option value="host"${role === "host" ? " selected" : ""}>Host — create and manage listings</option></select></label>
-          <p class="form-error hidden" id="demo-access-error" role="alert"></p>
-          <button class="button button-outline demo-access-submit" type="submit">Continue as demo <span aria-hidden="true">→</span></button>
-        </form>
-      </section>` : ""}
       <p class="auth-local-note">Gather accounts are securely managed and shared across your devices.</p>`;
     elements.modal.classList.remove("hidden");
     elements.modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     $("#auth-form").addEventListener("submit", submitAuth);
-    const demoAccessForm = $("#demo-access-form");
-    if (demoAccessForm) {
-      demoAccessForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        await startGuestSession(
-          new FormData(demoAccessForm).get("name"),
-          new FormData(demoAccessForm).get("role"),
-          $(".demo-access-submit", demoAccessForm),
-          $("#demo-access-error", demoAccessForm)
-        );
-      });
-    }
     $('[name="email"]', $("#auth-form")).focus();
   }
 
@@ -469,7 +368,7 @@
         Booking.isAvailable(offering, searchCheckin, searchCheckout, state.bookings.concat(state.unavailableDates), searchGuests);
     });
     if (sortMode === "price") filtered.sort((a, b) => Number(a.price) - Number(b.price));
-    if (sortMode === "rating") filtered.sort((a, b) => Number(b.rating) - Number(a.rating));
+    if (sortMode === "rating") filtered.sort((a, b) => Number(b.reviews > 0) - Number(a.reviews > 0) || Number(b.rating) - Number(a.rating));
     if (sortMode === "reviews") filtered.sort((a, b) => Number(b.reviews) - Number(a.reviews));
     return filtered;
   }
@@ -478,9 +377,12 @@
     const categories = ["All stays", ...new Set(state.offerings.map((item) => item.category))];
     if (currentUser) categories.push("Favorites");
     if (!categories.includes(selectedCategory)) selectedCategory = "All stays";
-    elements.categories.innerHTML = categories.map((category) =>
-      `<button type="button" class="category-pill${category === selectedCategory ? " selected" : ""}" data-category="${escapeHtml(category)}" aria-pressed="${category === selectedCategory}">${escapeHtml(category)}</button>`
-    ).join("");
+    elements.categories.innerHTML = categories.map((category) => {
+      const count = category === "All stays" ? state.offerings.length
+        : category === "Favorites" ? state.favorites.length
+          : state.offerings.filter((offering) => offering.category === category).length;
+      return `<button type="button" class="category-pill${category === selectedCategory ? " selected" : ""}" data-category="${escapeHtml(category)}" aria-pressed="${category === selectedCategory}"><span>${escapeHtml(category)}</span><small>${count}</small></button>`;
+    }).join("");
   }
 
   function renderOfferingCard(offering) {
@@ -493,15 +395,20 @@
           </button>
           <button type="button" class="favorite-button${state.favorites.includes(offering.id) ? " saved" : ""}" data-favorite="${escapeHtml(offering.id)}" aria-label="${state.favorites.includes(offering.id) ? "Remove" : "Save"} ${escapeHtml(offering.name)} ${state.favorites.includes(offering.id) ? "from" : "to"} favorites" aria-pressed="${state.favorites.includes(offering.id)}">${state.favorites.includes(offering.id) ? "♥" : "♡"}</button>
         </div>
-        <button class="offering-open" type="button" data-open-offering="${escapeHtml(offering.id)}" aria-label="Book ${escapeHtml(offering.name)}">
-          <div class="offering-title-row"><h3>${escapeHtml(offering.name)}</h3><span class="rating-chip"><span aria-hidden="true">★</span> ${Number(offering.rating || 4.6).toFixed(1)}</span></div>
-          <p class="offering-location">${escapeHtml(offering.category)} <span>·</span> ${escapeHtml(offering.location)}</p>
-          <p class="offering-summary">${escapeHtml(offering.description)}</p>
-          <div class="property-facts"><span>${Number(offering.guests)} guests</span><span>${Number(offering.bedrooms || 1)} bedroom${Number(offering.bedrooms) === 1 ? "" : "s"}</span><span>${Number(offering.bathrooms || 1)} bath</span></div>
-          <div class="amenity-row">${(offering.amenities || []).slice(0, 3).map((amenity) => `<span>${escapeHtml(amenity)}</span>`).join("")}</div>
-          <div class="offering-bottom"><span class="review-copy"><strong>${Number(offering.reviews || 0)} reviews</strong><small>Highly rated for a memorable stay</small></span><span class="price">${money(offering.price)}<small> / night</small></span></div>
-          <div class="stay-card-dates">${escapeHtml(stayDates(searchCheckin, searchCheckout))} <span>· ${Booking.getNights(searchCheckin, searchCheckout)} nights</span></div>
-        </button>
+        <div class="offering-open">
+          <div class="offering-details">
+            <div class="offering-title-row"><h3>${escapeHtml(offering.name)}</h3>${Number(offering.reviews) > 0 ? `<span class="rating-chip"><span aria-hidden="true">★</span> ${Number(offering.rating).toFixed(1)}</span>` : ""}</div>
+            <p class="offering-location">${escapeHtml(offering.category)} <span>·</span> ${escapeHtml(offering.location)}</p>
+            <p class="offering-summary">${escapeHtml(offering.description)}</p>
+            <div class="property-facts"><span>${Number(offering.guests)} guests</span><span>${Number(offering.bedrooms || 1)} bedroom${Number(offering.bedrooms) === 1 ? "" : "s"}</span><span>${Number(offering.bathrooms || 1)} bath</span></div>
+            <div class="amenity-row">${(offering.amenities || []).slice(0, 3).map((amenity) => `<span>${escapeHtml(amenity)}</span>`).join("")}</div>
+          </div>
+          <div class="offering-bottom">
+            <span class="review-copy"><strong>${Number(offering.reviews) > 0 ? `${Number(offering.reviews)} Gather reviews` : "New to Gather"}</strong><small>${Number(offering.reviews) > 0 ? "Guest feedback" : "Confirm details with the property"}</small></span>
+            <div class="price-action"><span class="price"><small>Est. </small>${money(offering.price)}<small> / night</small></span><button type="button" class="card-dates-button" data-open-offering="${escapeHtml(offering.id)}">Check dates <span aria-hidden="true">→</span></button></div>
+            <div class="stay-card-dates">${escapeHtml(stayDates(searchCheckin, searchCheckout))} <span>· ${Booking.getNights(searchCheckin, searchCheckout)} nights</span></div>
+          </div>
+        </div>
       </article>
     `;
   }
@@ -510,14 +417,37 @@
     const featuredIds = ["luntian-city-hotel", "vigan-heritage-inn", "tagaytay-farmstay"];
     const featured = featuredIds.map((id) => state.offerings.find((offering) => offering.id === id)).filter(Boolean);
     $("#home-featured-grid").innerHTML = featured.map(renderOfferingCard).join("");
+    observeOfferingsOnScroll($("#home-featured-grid"));
+  }
+
+  function observeOfferingsOnScroll(container) {
+    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!scrollRevealObserver) {
+      scrollRevealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      }, { threshold: 0.08, rootMargin: "0px 0px -24px 0px" });
+    }
+    $$(".offering-card", container).forEach((card) => {
+      card.classList.add("scroll-reveal");
+      scrollRevealObserver.observe(card);
+    });
   }
 
   function renderOfferings() {
     const filtered = getFilteredOfferings();
     if (activeTab === "search") renderStayMap(filtered);
+    elements.grid.classList.toggle("list-view", resultsViewMode === "list");
+    elements.grid.classList.toggle("grid-view", resultsViewMode === "grid");
+    $("#search-breadcrumb-location").textContent = searchTerm || "All destinations";
+    $("#stays-title").textContent = searchTerm ? `Stays in ${searchTerm}` : "Stays across the Philippines";
     elements.grid.innerHTML = filtered.map(renderOfferingCard).join("");
-    $("#results-count").innerHTML = `<strong>${filtered.length}</strong> ${filtered.length === 1 ? "stay" : "stays"} to fall for`;
-    $("#results-dates").textContent = `${Booking.getNights(searchCheckin, searchCheckout)} nights · ${searchGuests} ${searchGuests === 1 ? "guest" : "guests"}`;
+    observeOfferingsOnScroll(elements.grid);
+    $("#results-count").innerHTML = `<strong>${filtered.length}</strong> ${filtered.length === 1 ? "place" : "places"} match your search`;
+    $("#results-dates").textContent = `${stayDates(searchCheckin, searchCheckout)} · ${searchGuests} ${searchGuests === 1 ? "guest" : "guests"}`;
     $("#empty-offerings").classList.toggle("hidden", filtered.length > 0);
     if (selectedCategory === "Favorites") {
       $("#empty-offerings h3").textContent = state.favorites.length
@@ -756,13 +686,13 @@
       <article class="booking-card${booking.status === "cancelled" ? " cancelled" : ""}">
         <img class="booking-photo" src="${photoUrl(booking.image, 280)}" alt="">
         <div class="booking-detail">
-          <span class="booking-category">${escapeHtml(booking.category || "A Gather stay")} · ${escapeHtml(booking.status)}</span>
+          <span class="booking-category">${escapeHtml(booking.category || "A Gather stay")} · ${escapeHtml(booking.status === "pending" ? "Awaiting confirmation" : booking.status)}</span>
           <h3>${escapeHtml(booking.offeringName)}</h3>
           <p class="booking-location">${escapeHtml(booking.location || "")}</p>
           <p>${escapeHtml(stayDates(booking.checkin, booking.checkout))} <span class="detail-separator">·</span> ${Number(booking.nights)} nights, ${Number(booking.guests)} ${Number(booking.guests) === 1 ? "guest" : "guests"}</p>
-          <p class="booking-contact">Booked by ${escapeHtml(booking.name)}${booking.email ? ` · ${escapeHtml(booking.email)}` : " · Presentation guest"}</p>
+          <p class="booking-contact">Requested by ${escapeHtml(booking.name)}${booking.email ? ` · ${escapeHtml(booking.email)}` : ""}</p>
         </div>
-        <div class="booking-actions"><strong>${money(booking.total)}</strong>${booking.status !== "cancelled" ? `<button type="button" class="button button-outline" data-cancel-booking="${escapeHtml(booking.id)}">Cancel trip</button>` : `<span class="cancelled-label">Cancelled</span>`}</div>
+        <div class="booking-actions"><strong>${money(booking.total)}</strong>${booking.status !== "cancelled" ? `<button type="button" class="button button-outline" data-cancel-booking="${escapeHtml(booking.id)}">Cancel request</button>` : `<span class="cancelled-label">Cancelled</span>`}</div>
       </article>`).join("");
   }
 
@@ -808,7 +738,7 @@
       window.GatherChatBookingPreferences = null;
       syncSearchForms();
     }
-    if (!currentUser) {
+    if (!currentUser || currentUser.isAnonymous) {
       openAuthModal("signup", "guest", { type: "booking", offeringId });
       return;
     }
@@ -818,14 +748,14 @@
     const checkin = searchCheckin;
     const checkout = searchCheckout;
     elements.modalContent.innerHTML = `
-    <div class="modal-property"><img class="modal-photo" src="${photoUrl(offering.image, 1000)}" alt="Representative destination photo for ${escapeHtml(offering.location)}"><span class="modal-kicker">${escapeHtml(offering.badge || offering.category)} · ${Number(offering.rating || 4.6).toFixed(1)} ★</span><h2 id="modal-title">${escapeHtml(offering.name)}</h2><p class="modal-location">${escapeHtml(offering.location)} · ${Number(offering.guests)} guests · ${Number(offering.bedrooms || 1)} bedroom${Number(offering.bedrooms) === 1 ? "" : "s"}</p><p class="modal-description">${escapeHtml(offering.description)}</p><div class="modal-amenities">${(offering.amenities || []).map((amenity) => `<span>${escapeHtml(amenity)}</span>`).join("")}</div></div>
+    <div class="modal-property"><img class="modal-photo" src="${photoUrl(offering.image, 1000)}" alt="Representative destination photo for ${escapeHtml(offering.location)}"><span class="modal-kicker">${escapeHtml(offering.badge || offering.category)}${Number(offering.reviews) > 0 ? ` · ${Number(offering.rating).toFixed(1)} ★` : ""}</span><h2 id="modal-title">${escapeHtml(offering.name)}</h2><p class="modal-location">${escapeHtml(offering.location)} · Up to ${Number(offering.guests)} guests</p><p class="modal-description">${escapeHtml(offering.description)}</p><div class="modal-amenities">${(offering.amenities || []).map((amenity) => `<span>${escapeHtml(amenity)}</span>`).join("")}</div></div>
       <form class="booking-form" id="booking-form"><div class="picker-heading"><div><span class="step-number">01</span><strong>Choose your dates</strong></div><span>Make it a little escape</span></div>${dateInputsMarkup(checkin, checkout, "booking")}
         <label class="guest-input">Guests<select name="guests">${Array.from({ length: Number(offering.guests) }, (_, index) => index + 1).map((guests) => `<option value="${guests}"${guests === Math.min(searchGuests, Number(offering.guests)) ? " selected" : ""}>${guests} ${guests === 1 ? "guest" : "guests"}</option>`).join("")}</select></label>
         <div class="picker-heading details-heading"><div><span class="step-number">02</span><strong>Your details</strong></div><span>Almost there</span></div>
-        <div class="signed-in-details"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><span>${currentUser.isAnonymous ? currentUser.role === "host" ? "Demo host · no email account" : "Presentation guest" : escapeHtml(currentUser.email)}</span></div><small>${currentUser.isAnonymous ? "Demo session" : "Booking as a Gather guest"}</small></div>
+        <div class="signed-in-details"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><span>${escapeHtml(currentUser.email)}</span></div><small>Booking request as a Gather guest</small></div>
         <label class="notes-label">A note for your host <span>Optional</span><textarea name="notes" rows="2" maxlength="400" placeholder="Anything you’d like them to know?"></textarea></label>
-        ${currentUser.isAnonymous ? `<p class="booking-email-disclosure">This is a shared demo booking only. It will not be sent to a host, and no payment is collected.</p>` : `<p class="booking-email-disclosure">Your booking contact details will be shared with Gather’s admin for email notification.</p>`}
-        <div class="confirm-row"><div><strong id="booking-total">${money(offering.price * Booking.getNights(checkin, checkout))}</strong><span> · ${money(offering.price)} per night</span><small id="booking-nights">${Booking.getNights(checkin, checkout)} nights</small></div><button class="button button-dark" type="submit">${currentUser.isAnonymous ? "Add demo booking" : "Reserve your stay"} <span aria-hidden="true">→</span></button></div><p class="form-error hidden" id="form-error" role="alert"></p>
+        <p class="booking-email-disclosure">Your request is saved in Gather, not sent to the property. Rates and availability are indicative; contact the property directly to confirm. No payment is collected here.</p>
+        <div class="confirm-row"><div><strong id="booking-total">${money(offering.price * Booking.getNights(checkin, checkout))}</strong><span> · ${money(offering.price)} per night</span><small id="booking-nights">${Booking.getNights(checkin, checkout)} nights · estimated total</small></div><button class="button button-dark" type="submit">Request to book <span aria-hidden="true">→</span></button></div><p class="form-error hidden" id="form-error" role="alert"></p>
       </form>`;
     elements.modal.classList.remove("hidden");
     elements.modal.setAttribute("aria-hidden", "false");
@@ -858,9 +788,9 @@
     const nights = Booking.getNights(checkin, checkout);
     const guests = Number(formData.get("guests"));
     const confirmed = await requestConfirmation({
-      title: currentUser.isAnonymous ? "Add this demo booking?" : "Confirm your booking?",
-      message: `Review your stay at ${offering ? offering.name : "this property"}: ${stayDates(checkin, checkout)}, ${nights} ${nights === 1 ? "night" : "nights"}, ${guests} ${guests === 1 ? "guest" : "guests"}. Estimated total: ${money(Number(offering && offering.price) * nights)}.${currentUser.isAnonymous ? " This adds a shared demo record only—no host or real accommodation is contacted." : " This will create a reservation."}`,
-      confirmLabel: currentUser.isAnonymous ? "Add demo booking" : "Confirm booking"
+      title: "Save this booking request?",
+      message: `Save a request for ${stayDates(checkin, checkout)} at ${offering ? offering.name : "this property"} for ${nights} ${nights === 1 ? "night" : "nights"} and ${guests} ${guests === 1 ? "guest" : "guests"}? Estimated total: ${money(Number(offering && offering.price) * nights)}. This request is saved in Gather, not sent to the property. Contact the property directly to confirm availability and terms.`,
+      confirmLabel: "Save request"
     });
     if (!confirmed) return;
     button.disabled = true;
@@ -886,25 +816,23 @@
     navigate("bookings");
     refreshSharedData().catch((refreshError) => {
       console.error("Booking was saved, but shared data could not be refreshed.", refreshError);
-      showToast(`Booking confirmed, but refresh failed: ${refreshError.message}`);
+      showToast(`Your request was saved, but the trip list could not be refreshed: ${refreshError.message}`);
     });
-    if (currentUser.isAnonymous) {
-      showToast("Demo booking saved to shared Gather availability. No host was contacted and no payment was taken.");
-    } else if (!GatherEmailNotifications.isConfigured()) {
-      showToast("Booking saved. Admin email notifications still need setup.");
+    if (!GatherEmailNotifications.isConfigured()) {
+      showToast("Your request was saved, but its email notification could not be sent.");
     } else {
-      showToast(`Your ${booking.nights}-night stay at ${booking.offeringName} is confirmed.`);
+      showToast("Your request is saved in Gather. Contact the property directly to confirm it.");
       GatherEmailNotifications.sendBookingNotification(booking).then(() => {
-        showToast("Booking confirmed, and the admin was notified by email.");
+        showToast("Your request is saved in Gather. Contact the property directly to confirm it.");
       }).catch((notificationError) => {
         console.error("Could not send the booking email notification.", notificationError);
-        showToast("Booking confirmed, but the admin email notification failed.");
+        showToast("Your request was saved, but its email notification could not be sent.");
       });
     }
   }
 
   async function confirmChatBooking(details) {
-    if (!currentUser) {
+    if (!currentUser || currentUser.isAnonymous) {
       window.GatherChatBookingPreferences = {
         guests: details.guests,
         dates: { checkin: details.checkin, checkout: details.checkout }
@@ -932,9 +860,9 @@
     const nights = Booking.getNights(checkin, checkout);
     const total = Number(offering.price) * nights;
     const confirmed = await requestConfirmation({
-      title: currentUser.isAnonymous ? "Add this demo booking?" : "Confirm your booking?",
-      message: `Review your stay at ${offering.name}: ${stayDates(checkin, checkout)}, ${nights} ${nights === 1 ? "night" : "nights"}, ${guests} ${guests === 1 ? "guest" : "guests"}. Estimated total: ${money(total)}.${currentUser.isAnonymous ? " This adds a shared demo record only—no host or real accommodation is contacted." : " This will create a reservation."}`,
-      confirmLabel: currentUser.isAnonymous ? "Add demo booking" : "Confirm booking"
+      title: "Save this booking request?",
+      message: `Save a request for ${stayDates(checkin, checkout)} at ${offering.name} for ${nights} ${nights === 1 ? "night" : "nights"} and ${guests} ${guests === 1 ? "guest" : "guests"}? Estimated total: ${money(total)}. This request is saved in Gather, not sent to the property. Contact the property directly to confirm availability and terms.`,
+      confirmLabel: "Save request"
     });
     if (!confirmed) return { cancelled: true };
 
@@ -952,11 +880,6 @@
     $(".modal", elements.modal).classList.remove("auth-modal");
     elements.modal.classList.remove("auth-backdrop");
     document.body.classList.remove("modal-open");
-    if (welcomeGateRequired) showWelcomeGate();
-    else {
-      elements.appShell.inert = false;
-      elements.appShell.removeAttribute("aria-hidden");
-    }
     if (propertyPickerMap) {
       propertyPickerMap.remove();
       propertyPickerMap = null;
@@ -1163,7 +1086,7 @@
     const confirmed = await requestConfirmation({
       title: "Remove this listing?",
       message: activeBookings.length
-        ? `Remove “${offering.name}”? This will also cancel ${activeBookings.length} active reservation${activeBookings.length === 1 ? "" : "s"} and guests will no longer be able to book this place.`
+        ? `Remove “${offering.name}”? This will also cancel ${activeBookings.length} active booking request${activeBookings.length === 1 ? "" : "s"} and guests will no longer be able to request this place.`
         : `Remove “${offering.name}” from your listings? Guests will no longer be able to book it.`,
       confirmLabel: "Remove listing",
       danger: true
@@ -1207,8 +1130,8 @@
       });
       showToast("Reservation cancelled. Those dates are available again.");
     } catch (error) {
-      console.error("Could not cancel the Gather reservation.", error);
-      showToast(`Could not cancel reservation: ${error.message}`);
+      console.error("Could not cancel the Gather booking request.", error);
+      showToast(`Could not cancel booking request: ${error.message}`);
     }
   }
 
@@ -1238,9 +1161,6 @@
       customGuestCount.required = isCustom;
       if (isCustom && !customGuestCount.value) customGuestCount.value = "9";
     });
-    $("#show-demo-disclaimer").addEventListener("click", showDemoDisclaimer);
-    $("#welcome-continue-session").addEventListener("click", continueFromWelcome);
-    $("#welcome-switch-account").addEventListener("click", switchAccountFromWelcome);
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       updateSearchDates(form);
@@ -1256,14 +1176,19 @@
       navigate("search");
     });
   });
-  $("#sort-options").addEventListener("click", (event) => {
-    const option = event.target.closest("[data-sort]");
-    if (!option) return;
-    sortMode = option.dataset.sort;
-    $("#sort-options").querySelectorAll(".sort-option").forEach((button) => {
-      const selected = button === option;
-      button.classList.toggle("selected", selected);
-      button.setAttribute("aria-pressed", String(selected));
+  $("#welcome-dismiss").addEventListener("click", dismissWelcomeGate);
+  $("#sort-select").addEventListener("change", (event) => {
+    sortMode = event.currentTarget.value;
+    renderOfferings();
+  });
+  $("#results-view-toggle").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view-mode]");
+    if (!button) return;
+    resultsViewMode = button.dataset.viewMode;
+    $("#results-view-toggle").querySelectorAll("[data-view-mode]").forEach((option) => {
+      const selected = option === button;
+      option.classList.toggle("selected", selected);
+      option.setAttribute("aria-pressed", String(selected));
     });
     renderOfferings();
   });
@@ -1276,25 +1201,31 @@
     minRating = Number(event.target.value);
     renderOfferings();
   });
-  $("#expand-map").addEventListener("click", (event) => {
-    const expanded = $("#stay-results-layout").classList.toggle("map-expanded");
+  function setMapExpanded(expanded) {
+    const layout = $("#stay-results-layout");
+    const mapSection = $(".stay-map-section");
+    const mapColumn = $("#expanded-map-column");
+    const expandButton = $("#expand-map");
+    if (expanded) mapColumn.append(mapSection);
+    else $("#map-preview-slot").append(mapSection);
+    mapColumn.hidden = !expanded;
+    layout.classList.toggle("map-expanded", expanded);
     document.body.classList.toggle("map-open", expanded);
-    event.currentTarget.setAttribute("aria-expanded", String(expanded));
-    event.currentTarget.textContent = expanded ? "× Close map" : "⛶ Expand map";
+    expandButton.setAttribute("aria-expanded", String(expanded));
+    expandButton.innerHTML = expanded ? "Close map <span aria-hidden=\"true\">×</span>" : 'Show map <span aria-hidden="true">↗</span>';
+    $("#map-heading-kicker").textContent = expanded ? "INTERACTIVE MAP" : "MAP PREVIEW";
+    $("#stay-map-title").textContent = expanded ? "Stays near your search" : "Explore the area";
     window.setTimeout(() => {
-      if (!stayMap) return;
-      stayMap.invalidateSize({ pan: false });
+      if (stayMap) stayMap.invalidateSize({ pan: false });
     }, 250);
+  }
+  $("#expand-map").addEventListener("click", () => {
+    setMapExpanded(!$("#stay-results-layout").classList.contains("map-expanded"));
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && $("#stay-results-layout").classList.contains("map-expanded")) {
-      $("#stay-results-layout").classList.remove("map-expanded");
-      document.body.classList.remove("map-open");
-      const expandButton = $("#expand-map");
-      expandButton.setAttribute("aria-expanded", "false");
-      expandButton.textContent = "⛶ Expand map";
-      expandButton.focus();
-      window.setTimeout(() => stayMap && stayMap.invalidateSize({ pan: false }), 250);
+      setMapExpanded(false);
+      $("#expand-map").focus();
     }
   });
   $("#clear-filters").addEventListener("click", () => {
@@ -1334,8 +1265,8 @@
       }
       return;
     }
-    if (event.target.closest("#guide-demo-details")) {
-      showDemoDisclaimer();
+    if (event.target.closest("#guide-booking-note")) {
+      showBookingDisclaimer();
       return;
     }
     const accountAction = event.target.closest("[data-account-action]");
@@ -1456,7 +1387,6 @@
     currentUser = account;
     window.dispatchEvent(new CustomEvent("gather-auth-changed"));
     renderAccountButton();
-    updateWelcomeGate();
     refreshSharedData().catch((error) => {
       console.error("Could not refresh shared Gather data after an account change.", error);
       showToast(`Could not load shared Gather data: ${error.message}`);
@@ -1478,14 +1408,13 @@
       renderAccountButton();
       renderAll();
     }
-    isInitializing = false;
     const initialRoute = window.location.hash.slice(1) === "browse" ? "home" : window.location.hash.slice(1);
     if (["home", "search", "bookings", "manage", "guide"].includes(initialRoute) && initialRoute !== "home") {
       navigate(initialRoute, false);
     } else {
       navigate("home", false);
     }
-    showWelcomeGate();
+    if (window.sessionStorage.getItem("gather-booking-disclaimer-accepted") !== "true") showWelcomeGate();
   }
   initialize();
 })();

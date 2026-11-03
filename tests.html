@@ -13,7 +13,7 @@
   </head>
   <body>
     <h1>Stay booking checks</h1>
-    <p>Focused browser-native tests for booking rules, the built-in Gather assistant, presentation guest access, shared listings and photo uploads, EmailJS notifications, and the Philippines map asset.</p>
+    <p>Focused browser-native tests for booking rules and requests, the Gather assistant, shared listings and photo uploads, EmailJS notifications, and the Philippines map asset.</p>
     <ol id="results"></ol>
     <p id="summary" role="status"></p>
     <script src="booking.js"></script>
@@ -83,12 +83,15 @@
           throws(() => api.validateGuestName(" "), "between 2 and 80");
           throws(() => api.validateGuestName("x".repeat(81)), "between 2 and 80");
         });
-        test("starts with sample stays across Philippine destinations and PHP prices", function () {
-          assert(state.offerings.length === 8, "Should include eight sample stays");
+        test("starts with real Philippine property listings and indicative PHP prices", function () {
+          assert(state.offerings.length >= 25, "Should include at least 25 property listings");
+          assert(new Set(state.offerings.map((offering) => offering.id)).size === state.offerings.length, "Every property should have a unique ID");
+          assert(new Set(state.offerings.map((offering) => offering.name)).size === state.offerings.length, "Every property should have a unique name");
           assert(state.offerings.every((offering) => offering.rating >= 1 && offering.rating <= 5), "Sample stay ratings should use a five-point scale");
           assert(state.offerings.every((offering) => /Philippines|Siargao|Baguio|Bohol|Palawan|Coron/.test(offering.location)), "Sample stays should be in the Philippines");
           assert(state.offerings.every((offering) => offering.price >= 1000), "Nightly prices should use realistic PHP amounts");
-          assert(["City hotels", "Serviced apartments", "Heritage inns", "Farm stays"].every((category) => state.offerings.some((offering) => offering.category === category)), "Sample stays should include hotels and different kinds of places");
+          assert(["City hotels", "Beach resorts", "Mountain hotels", "Heritage hotels"].every((category) => state.offerings.some((offering) => offering.category === category)), "Listings should include varied Philippine property categories");
+          assert(state.offerings.some((offering) => offering.name === "The Peninsula Manila") && state.offerings.some((offering) => offering.name === "Hotel Luna"), "The listings should use real Philippine property names");
           assert(state.offerings.every((offering) =>
             Number.isFinite(offering.latitude) && offering.latitude >= 4 && offering.latitude <= 22 &&
             Number.isFinite(offering.longitude) && offering.longitude >= 115 && offering.longitude <= 128
@@ -105,7 +108,7 @@
           const saved = state.offerings.slice(0, 4).map((offering) => ({ ...offering, price: offering.price + 100 }));
           saved.push({ id: "host-place", name: "Host place", category: "Guest houses", location: "Cebu City, Philippines", price: 3000, days: [0, 1, 2, 3, 4, 5, 6], amenities: [] });
           const merged = api.withDefaultOfferings(saved);
-          assert(merged.length === 9, "Should add four defaults while preserving the saved host listing");
+          assert(merged.length === api.DEFAULT_OFFERINGS.length + 1, "Should add missing defaults while preserving the saved host listing");
           assert(merged.find((offering) => offering.id === "isla-norte").price === saved[0].price, "Should preserve saved edits to existing stays");
           assert(Number.isFinite(merged.find((offering) => offering.id === "isla-norte").latitude), "Should add map coordinates to existing saved stays");
           assert(merged.some((offering) => offering.id === "host-place"), "Should preserve host-created listings");
@@ -116,8 +119,8 @@
         });
         test("allows an available stay with the right capacity and minimum nights", function () {
           assert(api.isAvailable(casa, checkin, checkout, [], 2, now), "Three-night stay should be bookable");
-          assert(!api.isAvailable(casa, checkin, "2030-01-08", [], 2, now), "Casa Mare requires two nights minimum");
-          assert(!api.isAvailable(casa, checkin, checkout, [], 5, now), "This stay accommodates up to four guests");
+          assert(!api.isAvailable({ ...casa, minimumNights: 2 }, checkin, "2030-01-08", [], 2, now), "A minimum-stay rule should be enforced");
+          assert(!api.isAvailable(casa, checkin, checkout, [], 3, now), "The listing currently allows up to two guests");
         });
         test("rejects stays in the past and unavailable check-in days", function () {
           const weekdayOnly = { ...casa, days: [1] };
@@ -129,20 +132,22 @@
           assert(!api.isAvailable(casa, "2030-01-09", "2030-01-12", reserved, 1, now), "Overlapping nights should be blocked");
           assert(api.isAvailable(casa, "2030-01-10", "2030-01-12", reserved, 1, now), "A same-day checkout/check-in is valid");
           assert(api.isAvailable(casa, "2030-01-09", "2030-01-12", [{ ...reserved[0], status: "cancelled" }], 1, now), "Cancelled trips should release the dates");
+          assert(api.isAvailable(casa, "2030-01-09", "2030-01-12", [{ ...reserved[0], status: "pending" }], 1, now), "Pending requests should not reserve dates");
         });
         test("creates a reservation with the correct nightly total and guest count", function () {
           const bookingState = api.createInitialState();
           bookingState.offerings.find((offering) => offering.id === casa.id).ownerId = "host-123";
           const booking = api.createBooking(bookingState, { offeringId: casa.id, checkin, checkout, guests: 2, name: "Jamie Lee", email: "jamie@example.com", accountId: "guest-123", notes: "First visit" }, now);
           assert(booking.nights === 3 && booking.total === casa.price * 3, "Total should be nightly price times nights");
-          assert(booking.guests === 2 && booking.status === "confirmed" && booking.notes === "First visit", "Guest count and confirmation should be recorded");
+          assert(booking.guests === 2 && booking.status === "pending" && booking.notes === "First visit", "Guest count and pending request status should be recorded");
           assert(booking.accountId === "guest-123", "The trip should belong to the signed-in guest");
           assert(booking.hostId === "host-123", "The reservation should be linked to the listing host");
-          assert(bookingState.bookings.length === 1, "The confirmed trip should be saved in the booking state");
+          assert(bookingState.bookings.length === 1, "The booking request should be saved in the booking state");
         });
         test("rejects conflicts, invalid contact details, and invalid stay dates", function () {
           const bookingState = api.createInitialState();
           api.createBooking(bookingState, { offeringId: casa.id, checkin, checkout, guests: 2, name: "Jamie Lee", email: "jamie@example.com" }, now);
+          bookingState.bookings[0].status = "confirmed";
           throws(() => api.createBooking(bookingState, { offeringId: casa.id, checkin: "2030-01-09", checkout: "2030-01-12", guests: 1, name: "Alex Doe", email: "alex@example.com" }, now), "not available");
           throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin, checkout, guests: 2, name: "Alex Doe", email: "not-an-email" }, now), "valid email");
           throws(() => api.createBooking(api.createInitialState(), { offeringId: casa.id, checkin: "2030-01-05", checkout, guests: 2, name: "Alex Doe", email: "alex@example.com" }, now), "future");
@@ -173,8 +178,14 @@
             assert(markup.includes('data-scroll-target="stay-map"') && markup.includes('data-expand-map="true"') && markup.includes('Short intro to read aloud'), "Presenter notes should include a clickable expanded-map shortcut and read-aloud introduction");
             assert(markup.includes("Tools and services behind Gather") && markup.includes("Supabase Auth, Postgres, and Storage") && markup.includes("Groq AI service") && markup.includes("EmailJS") && markup.includes("Gmail inbox") && markup.includes("GitHub Pages") && markup.includes("Leaflet"), "Presenter notes should identify the main services and their roles without exposing credentials");
             assert(styles.includes("feature-guide-view") && styles.includes("--green: #28796b") && styles.includes("--sans:"), "The presenter guide and refreshed color and typography system should be styled");
-            assert(markup.includes('<details class="filter-disclosure">') && markup.includes("Budget, guest rating &amp; demo details") && markup.includes('id="max-price-filter"') && markup.includes('id="min-rating-filter"'), "Find stays should keep budget and rating filters available in a compact disclosure");
-            assert(styles.includes(".stay-results-column { min-width: 0; }") && styles.includes("position: sticky; top: 92px") && styles.includes("order: 2") && styles.includes("category-row::-webkit-scrollbar { display: none; }"), "Find stays should avoid nested scrolling, keep the desktop map visible, and present a clean category rail");
+            assert(markup.includes('id="welcome-gate"') && markup.includes('id="welcome-dismiss"') && markup.includes("A booking request is not a confirmed reservation") && !markup.includes("id=\"welcome-continue-session\""), "The entry disclaimer should explain pending requests without forcing sign-in");
+            assert(markup.includes('id="category-filters"') && markup.includes('class="stay-filter-sidebar"') && markup.includes('id="max-price-filter"') && markup.includes('id="min-rating-filter"'), "Find stays should keep categories and key filters in a dedicated left sidebar");
+            assert(markup.includes('id="sort-select"') && markup.includes('id="results-view-toggle"') && markup.includes('data-view-mode="list"') && markup.includes('data-view-mode="grid"'), "Search results should offer accessible sort and list or grid controls");
+            assert(markup.includes('id="map-preview-slot"') && markup.includes('id="expanded-map-column"') && appScript.includes('mapColumn.append(mapSection)'), "Opening the map should expand into a split view while retaining filters and results");
+            assert(styles.includes(".map-preview-slot .map-attribution { display: none; }"), "Keep detailed boundary credits out of the compact map preview");
+            assert(markup.includes("Request to book") || appScript.includes("Request to book"), "Guests should see a sign-in-gated request-to-book flow");
+            assert(appScript.includes('if (!currentUser || currentUser.isAnonymous)') && appScript.includes('openAuthModal("signup", "guest", { type: "booking", offeringId })'), "An account should be required only when a guest starts a booking request");
+            assert(styles.includes(".stay-filter-sidebar .category-row { flex-direction: column;") && styles.includes(".stay-filter-sidebar { position: static; width: 100%; max-width: 100%;") && styles.includes(".stay-results-layout { height: auto; min-height: 0; display: flex; flex-direction: column;") && styles.includes(".offering-card.scroll-reveal"), "Categories should stack on the left, fit mobile viewports, and listings should animate into view");
           });
           await testAsync("streams real AI replies through the authenticated Supabase proxy", async function () {
             const source = await (await fetch("./supabase-data.js")).text();
@@ -223,7 +234,7 @@
           });
           await testAsync("recommends real stays from destination, budget, and guest preferences", function () {
             const data = { offerings: api.DEFAULT_OFFERINGS, bookings: [], unavailableDates: [] };
-            const result = window.GatherAssistant.respond("Find a quiet beach stay in Siargao for 4 guests under PHP 7000", data, {});
+            const result = window.GatherAssistant.respond("Find a quiet beach stay in Siargao for 2 guests under PHP 10000", data, {});
             assert(result.stays.length === 1 && result.stays[0].id === "isla-norte", "Should find the Siargao listing within the requested capacity and price");
             const checkin = api.addDays(api.toDateString(new Date()), 5);
             const checkout = api.addDays(checkin, 2);
@@ -233,7 +244,7 @@
             const noMatch = window.GatherAssistant.respond("Find a Baguio stay for 8 guests", data, {});
             assert(noMatch.stays.length === 0 && /fewer guests/.test(noMatch.reply), "Should not recommend stays that cannot accommodate the requested group");
           });
-          await testAsync("collects booking details in chat and prepares a confirmed reservation", function () {
+          await testAsync("collects booking details in chat and prepares a pending request", function () {
             const data = { offerings: api.DEFAULT_OFFERINGS, bookings: [], unavailableDates: [] };
             const offering = data.offerings.find((item) => item.id === "isla-norte");
             const selected = window.GatherAssistant.startBooking(offering.id, data, { preferences: {} });
@@ -263,7 +274,7 @@
             result = window.GatherAssistant.respond("₱4,200 per night", data, result.state);
             result = window.GatherAssistant.respond("A quiet cabin with pine views and a small kitchen.", data, result.state);
             assert(result.listingDraft && result.listingDraft.name === "Amihan test cabin" && result.listingDraft.location === "Baguio City", "Should prepare the listing with information supplied in the conversation");
-            assert(result.listingDraft.guests === 4 && result.listingDraft.price === 4200 && result.listingDraft.category === "Mountain escapes", "Should capture guest capacity, nightly PHP price, and inferred category");
+            assert(result.listingDraft.guests === 4 && result.listingDraft.price === 4200 && result.listingDraft.category === "Mountain hotels", "Should capture guest capacity, nightly PHP price, and inferred category");
           });
           await testAsync("renders booking and listing actions from the local assistant", async function () {
             const chatScript = await (await fetch("./chat.js")).text();
@@ -308,8 +319,8 @@
               const checkout = api.addDays(checkin, 2);
               await send(`${checkin} to ${checkout}`);
               await send("2 guests");
-              const confirmButton = Array.from(chatWindow.document.querySelectorAll(".trip-chat-actions button")).find((button) => button.textContent.includes("Confirm booking"));
-              assert(confirmButton, "A complete chat booking should offer an explicit confirmation action");
+              const confirmButton = Array.from(chatWindow.document.querySelectorAll(".trip-chat-actions button")).find((button) => button.textContent.includes("Request to book"));
+              assert(confirmButton, "A complete chat booking should offer an explicit request action");
               let confirmedDetails = null;
               chatWindow.GatherChatActions = {
                 confirmBooking: async (details) => {
@@ -320,7 +331,7 @@
               confirmButton.click();
               await new Promise((resolve) => setTimeout(resolve, 0));
               assert(confirmedDetails && confirmedDetails.offeringId === "stay-1" && confirmedDetails.checkin === checkin && confirmedDetails.guests === 2, "Confirmation should submit the exact details collected in chat");
-              assert(chatWindow.document.querySelector(".trip-chat-message.assistant:last-child").textContent.includes("is booked"), "A successful booking should return a chat confirmation");
+              assert(chatWindow.document.querySelector(".trip-chat-message.assistant:last-child").textContent.includes("request") && chatWindow.document.querySelector(".trip-chat-message.assistant:last-child").textContent.includes("not sent to or confirmed"), "A successful request should not be described as a confirmed booking");
               await send("I want to list my property");
               await send("Island home");
               await send("Siargao");
@@ -349,61 +360,22 @@
             const schema = await response.text();
             assert(schema.includes("where id = 'isla-norte' and image = 'photo-1510414842594-a61c69b5ae57'"), "The schema should update only an unchanged default photo for existing stays");
             assert(schema.includes("'assets/stays/siargao-cloud9.jpg'"), "The schema should seed the local destination photo");
+            assert(api.DEFAULT_OFFERINGS.every((offering) => schema.includes(`('${offering.id}',`)), "The Supabase migration should seed every default listing");
           });
-          await testAsync("starts a shared anonymous guest session with the entered name", async function () {
-            const client = window.GatherSupabase.client;
-            const originalSignInAnonymously = client.auth.signInAnonymously;
-            const originalFrom = client.from;
-            let authOptions = null;
-            client.auth.signInAnonymously = async function (options) {
-              authOptions = options;
-              return { data: { user: { id: "guest-test", is_anonymous: true } }, error: null };
-            };
-            client.from = function (table) {
-              assert(table === "profiles", "Guest sign-in should load the profile created by the auth trigger");
-              return {
-                select: function () { return this; },
-                eq: function (column, value) {
-                  assert(column === "id" && value === "guest-test", "Should load only the new guest profile");
-                  return this;
-                },
-                single: async function () {
-                  return { data: { id: "guest-test", name: "Jamie Lee", email: null, role: authOptions.options.data.role }, error: null };
-                }
-              };
-            };
-            try {
-              const account = await window.GatherSupabase.signInAnonymously("  Jamie Lee  ");
-              assert(account.id === "guest-test" && account.name === "Jamie Lee", "Should return the created guest profile");
-              assert(account.role === "guest" && account.isAnonymous && account.email === null, "Guest profile should be anonymous and require no email");
-              assert(authOptions.options.data.name === "Jamie Lee" && authOptions.options.data.role === "guest", "Should save the trimmed guest name as guest metadata");
-              const hostAccount = await window.GatherSupabase.signInAnonymously("Gather Demo Host", "host");
-              assert(hostAccount.role === "host" && hostAccount.isAnonymous && hostAccount.email === null, "Demo host sessions should use the host role without an email account");
-              assert(authOptions.options.data.name === "Gather Demo Host" && authOptions.options.data.role === "host", "Should create the demo host with host metadata");
-            } finally {
-              client.auth.signInAnonymously = originalSignInAnonymously;
-              client.from = originalFrom;
-            }
-          });
-          await testAsync("shows a clear demo disclosure before sign-in and unified guest or host access", async function () {
+          await testAsync("allows browsing behind a clear booking disclaimer and gates booking on sign-in", async function () {
             const response = await fetch("./index.html");
             assert(response.ok, "The app page should be available");
             const markup = await response.text();
-            assert(markup.includes('id="welcome-gate"') && markup.includes('aria-modal="true"'), "The welcome disclaimer should be a modal gate");
-            assert(markup.includes('id="welcome-switch-account"'), "Signed-in visitors should be offered a sign-out and account-switch option from the welcome gate");
-            assert(markup.includes('id="app-shell" inert aria-hidden="true"'), "The app should be inaccessible until the guest acknowledges the gate");
+            assert(markup.includes('id="welcome-gate"') && markup.includes('aria-modal="true"') && markup.includes('id="welcome-dismiss"'), "The entry disclaimer should be dismissible");
+            assert(!markup.includes('id="app-shell" inert') && !markup.includes("Presentation demo"), "The disclaimer should not block browsing or present the site as a demo");
             assert(markup.indexOf('id="welcome-gate"') < markup.indexOf('id="booking-modal"'), "The disclosure should appear before the sign-in dialog in the experience");
-            assert(markup.includes("Property details, prices, ratings, and availability are examples, not live offers."), "The disclosure should read clearly and distinguish demo content from live offers");
-            assert(markup.includes("Bookings are demo records only. They do not reserve accommodation, contact a host, or process payment."), "The disclosure should clearly describe booking limitations");
-            assert(!markup.includes("Continue as a guest") && !markup.includes("Continue as demo host"), "Separate guest and host continue buttons should be removed");
-            assert(markup.includes('id="show-demo-disclaimer"') && markup.includes("Presentation demo") && markup.includes("Sample stays and prices; bookings are not real."), "A persistent demo notice should remain available after the welcome gate closes");
+            assert(markup.includes("A booking request is not a confirmed reservation") && markup.includes("Do not submit payment details"), "The disclaimer should explain that a request is not a reservation and Gather does not take payment");
             const appScript = await (await fetch("./app.js")).text();
             const styles = await (await fetch("./styles.css")).text();
             assert(appScript.includes('classList.add("auth-modal")') && appScript.includes('[name="email"]'), "The auth dialog should be separately marked and focus its first field");
-            assert(styles.includes(".confirmation-backdrop { z-index: 60") && styles.includes(".welcome-backdrop { z-index: 50"), "Confirmation dialogs should stack above the welcome gate so sign-out can be confirmed");
-            assert(appScript.includes('id="demo-access-form"') && appScript.includes('name="role"><option value="guest"${role === "guest"') && appScript.includes('<option value="host"${role === "host"'), "One demo-access form should let visitors choose guest or host");
-            assert(appScript.includes("Continue to sign in") && appScript.includes("Continue as demo"), "The disclosure should lead to sign-in, which offers one combined demo-access action");
-            assert(styles.includes(".modal.auth-modal { width: min(100%, 640px)") && styles.includes(".auth-form input, .auth-form select { width: 100%; min-height: 52px") && styles.includes(".modal-backdrop.auth-backdrop"), "Sign-in should have a larger panel and accessible controls without resizing the guest welcome gate");
+            assert(appScript.includes('openAuthModal("signup", "guest", { type: "booking", offeringId })') && appScript.includes('if (!currentUser || currentUser.isAnonymous)'), "An unauthenticated visitor should be prompted to create an account only on a booking request");
+            assert(appScript.includes('if (window.sessionStorage.getItem("gather-booking-disclaimer-accepted") !== "true") showWelcomeGate()'), "The disclaimer should appear once per browser session");
+            assert(styles.includes(".modal.auth-modal { width: min(100%, 640px)") && styles.includes(".auth-form input, .auth-form select { width: 100%; min-height: 52px") && styles.includes(".modal-backdrop.auth-backdrop"), "Sign-in should remain usable with accessible controls");
           });
           await testAsync("loads shared Philippine stays and public availability from Supabase", async function () {
             const shared = await window.GatherSupabase.loadData(null);
