@@ -1294,10 +1294,6 @@
       }
       return;
     }
-    if (event.target.closest("#guide-booking-note")) {
-      showBookingDisclaimer();
-      return;
-    }
     const accountAction = event.target.closest("[data-account-action]");
     if (accountAction) {
       const action = accountAction.dataset.accountAction;
@@ -1388,7 +1384,7 @@
   window.addEventListener("hashchange", () => {
     const route = window.location.hash.slice(1);
     const target = route === "browse" ? "home" : route;
-    if (target && ["home", "search", "bookings", "manage", "guide"].includes(target) && target !== activeTab) {
+    if (target && ["home", "search", "bookings", "manage"].includes(target) && target !== activeTab) {
       navigate(target, false);
     }
   });
@@ -1441,7 +1437,7 @@
       renderAll();
     }
     const initialRoute = window.location.hash.slice(1) === "browse" ? "home" : window.location.hash.slice(1);
-    if (["home", "search", "bookings", "manage", "guide"].includes(initialRoute) && initialRoute !== "home") {
+    if (["home", "search", "bookings", "manage"].includes(initialRoute) && initialRoute !== "home") {
       navigate(initialRoute, false);
     } else {
       navigate("home", false);

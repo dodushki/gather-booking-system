@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f5f7f5">
     <meta name="description" content="Find your place to stay. Browse thoughtful spaces, check your dates, and book with Gather.">
     <title>Gather — Places that feel like somewhere</title>
-    <link rel="stylesheet" href="styles.css?v=20261103-chat">
+    <link rel="stylesheet" href="styles.css?v=20261103-layout">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   </head>
   <body>
@@ -21,7 +21,6 @@
         <div class="header-actions">
           <button class="nav-link host-link" type="button" data-tab-link="manage">List your property <span aria-hidden="true">↗</span></button>
           <button type="button" class="profile-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown"><span class="profile-dot" aria-hidden="true">G</span><span id="account-button-label">Sign in</span></button>
-          <button type="button" class="feature-guide-trigger" data-tab-link="guide" aria-label="Open presenter notes" title="Open presenter notes"><span aria-hidden="true">▦</span> Tour</button>
         </div>
       </header>
       <main>
@@ -139,63 +138,6 @@
           <section class="host-reservations"><div class="section-heading"><div><p class="eyebrow">GUEST INTEREST IN YOUR PLACES</p><h2>Booking <em>requests.</em></h2></div></div><p class="host-request-note">Requests are not sent to guests or confirmed in Gather. Contact them directly to verify dates, rates, and terms.</p><div class="booking-list" id="host-booking-list"></div><div class="host-empty" id="host-booking-empty">New booking requests for your places will show up here.</div></section>
         </section>
 
-        <section class="view feature-guide-view" id="guide-view" aria-labelledby="guide-title" hidden>
-          <div class="feature-guide-intro">
-            <p class="eyebrow">PRESENTER NOTES · A QUICK TOUR</p>
-            <h1 id="guide-title">What Gather <em>can do.</em></h1>
-            <p>Use this written outline while presenting. Each section expands for a short feature summary, and links jump to the matching part of the site.</p>
-          </div>
-          <div class="feature-guide-groups">
-            <details class="feature-guide-group" open>
-              <summary><span class="guide-summary-copy"><strong>Finding and exploring stays</strong><small>Search tools, destinations, comparison, favourites, and the map</small></span><span class="guide-count">6 talking points</span></summary>
-              <ul class="guide-script-list">
-                <li><span><strong>Search:</strong> Find a stay by Philippine destination, check-in and check-out dates, and group size, including up to 20 guests.</span><a href="#search" data-tab-link="search">Show search</a></li>
-                <li><span><strong>Destinations:</strong> Browse featured places and stays across island, beach, city, mountain, heritage, farm, and nature categories.</span><a href="#search" data-tab-link="search">Browse stays</a></li>
-                <li><span><strong>Compare:</strong> Sort by Gather picks, price, guest rating, or reviews. Filter by stay type, nightly budget, and minimum rating.</span><a href="#search" data-tab-link="search">Show filters</a></li>
-                <li><span><strong>Stay details:</strong> Open a stay to review its description, amenities, capacity, estimated price, and dates.</span><a href="#search" data-tab-link="search">Open stay search</a></li>
-                <li><span><strong>Favourites:</strong> Signed-in guests can save places and filter to see saved stays together.</span><a href="#search" data-tab-link="search">Show stays</a></li>
-                <li><span><strong>Interactive map:</strong> Markers show approximate stay locations. Click a marker for stay details; expand the map to explore the Philippines more easily.</span><a href="#search" data-tab-link="search" data-scroll-target="stay-map" data-expand-map="true">Open expanded map</a></li>
-              </ul>
-            </details>
-            <details class="feature-guide-group">
-              <summary><span class="guide-summary-copy"><strong>Booking and managing trips</strong><small>Availability checks, booking requests, and My trips</small></span><span class="guide-count">3 talking points</span></summary>
-              <ul class="guide-script-list">
-                <li><span><strong>Availability:</strong> Gather checks the details currently on file, but the property must verify dates and terms before accepting a request.</span><a href="#search" data-tab-link="search">Choose a stay</a></li>
-                <li><span><strong>Booking request:</strong> Review dates, guests, and an indicative total. Your request stays pending until the property confirms it.</span><a href="#search" data-tab-link="search">Start a request</a></li>
-                <li><span><strong>My trips:</strong> Signed-in guests can review the status of their booking requests and cancel a request.</span><a href="#bookings" data-tab-link="bookings">Open My trips</a></li>
-              </ul>
-            </details>
-            <details class="feature-guide-group">
-              <summary><span class="guide-summary-copy"><strong>Hosting a place</strong><small>Listings, approximate map locations, availability, and reservations</small></span><span class="guide-count">4 talking points</span></summary>
-              <ul class="guide-script-list">
-                <li><span><strong>Create a listing:</strong> Hosts can add a place name, category, description, guest capacity, nightly price, amenities, and photos.</span><a href="#manage" data-tab-link="manage">Open host tools</a></li>
-                <li><span><strong>Set the location:</strong> Choose an approximate location on the Philippines map or provide coordinates for the public map marker.</span><a href="#manage" data-tab-link="manage">Show host tools</a></li>
-                <li><span><strong>Manage availability:</strong> Set eligible check-in days and the minimum stay, then edit your listing as needed.</span><a href="#manage" data-tab-link="manage">Manage a place</a></li>
-                <li><span><strong>Review requests:</strong> Hosts can see requests associated with their listings and contact guests directly to verify details.</span><a href="#manage" data-tab-link="manage">Open host dashboard</a></li>
-              </ul>
-            </details>
-            <details class="feature-guide-group">
-              <summary><span class="guide-summary-copy"><strong>AI help and booking information</strong><small>Trip assistance, account access, and booking request expectations</small></span><span class="guide-count">3 talking points</span></summary>
-              <ul class="guide-script-list">
-                <li><span><strong>AI booking agent:</strong> Ask for recommendations using Gather’s listed stays, discuss trip details, or prepare a host listing draft.</span><a href="#home" data-tab-link="home" data-open-chat="true">Open Gather chat</a></li>
-                <li><span><strong>Booking with AI:</strong> The assistant can collect dates and guest count, but Gather checks the details on file and saves only a pending request after guest confirmation.</span><a href="#home" data-tab-link="home" data-open-chat="true">Show the assistant</a></li>
-                <li><span><strong>Booking requests:</strong> A request is saved in Gather, not sent to the property or confirmed. Contact the property directly to verify availability and terms; no payment is collected on Gather.</span><button type="button" class="guide-text-button" id="guide-booking-note">Review booking information</button></li>
-              </ul>
-            </details>
-            <details class="feature-guide-group">
-              <summary><span class="guide-summary-copy"><strong>Tools and services behind Gather</strong><small>The technology and online services used on the site</small></span><span class="guide-count">6 talking points</span></summary>
-              <ul class="guide-script-list">
-                <li><span><strong>Website and publishing:</strong> Gather uses HTML, CSS, and JavaScript, and is published with GitHub Pages.</span></li>
-                <li><span><strong>Accounts and shared data:</strong> Supabase Auth, Postgres, and Storage support accounts, listings, bookings, favourites, availability, and host-uploaded photos.</span></li>
-                <li><span><strong>AI chat:</strong> A Supabase Edge Function securely connects Gather to its configured Groq AI service; provider credentials stay in server-side secrets.</span></li>
-                <li><span><strong>Booking email:</strong> EmailJS sends configured booking-request notifications to the owner’s Gmail inbox for registered guests.</span></li>
-                <li><span><strong>Interactive map:</strong> Leaflet displays Esri map tiles, with OpenStreetMap attribution and a Philippines boundary from geoBoundaries, OCHA Philippines, and NAMRIA.</span></li>
-                <li><span><strong>Photography:</strong> Stay photos are stored in the project; the home-page hero image loads from Unsplash. Images are illustrative and may not show the listed stay.</span></li>
-              </ul>
-            </details>
-          </div>
-          <p class="feature-guide-note"><strong>Short intro to read aloud:</strong> “Gather helps travelers explore places to stay across the Philippines, compare details, and send booking requests. Guests can keep trip plans together, while hosts can manage their listings. The map is clickable and expandable, and the AI assistant can help explore the available stays.”</p>
-        </section>
       </main>
     </div>
 
@@ -255,7 +197,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="supabase-data.js"></script>
-    <script src="app.js?v=20261103-photos"></script>
+    <script src="app.js?v=20261103-layout"></script>
     <script src="assistant-engine.js"></script>
     <script src="chat.js"></script>
   </body>
