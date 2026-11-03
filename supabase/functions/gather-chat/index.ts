@@ -36,9 +36,10 @@ Deno.serve(async (request: Request) => {
     return jsonResponse(origin, 401, { error: "Sign in or choose demo access before chatting with Gather." });
   }
 
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) {
-    return jsonResponse(origin, 503, { error: "Gather’s AI assistant is not configured yet. Add the OpenAI API key to Supabase and deploy the chat function." });
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const apiKey = Deno.env.get("CLOUDFLARE_API_TOKEN");
+  if (!accountId || !/^[a-f0-9]{32}$/i.test(accountId) || !apiKey) {
+    return jsonResponse(origin, 503, { error: "Gather’s AI assistant is not configured yet. Add the Cloudflare Workers AI account ID and API token to Supabase, then deploy the chat function." });
   }
 
   let body: unknown;
@@ -99,14 +100,14 @@ Current public listings (PHP per night):
 ${JSON.stringify(publicListings)}`;
 
   try {
-    const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
+    const upstream = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "@cf/meta/llama-3.2-3b-instruct",
         stream: true,
         max_tokens: 450,
         temperature: 0.6,
@@ -115,7 +116,10 @@ ${JSON.stringify(publicListings)}`;
     });
 
     if (!upstream.ok || !upstream.body) {
-      console.error("OpenAI chat request failed.", upstream.status);
+      console.error("Cloudflare Workers AI chat request failed.", upstream.status);
+      if (upstream.status === 429) {
+        return jsonResponse(origin, 429, { error: "Gather has reached today’s free AI allowance. Please try again after it resets." });
+      }
       return jsonResponse(origin, 502, { error: "Gather’s AI assistant couldn’t reply just now. Please try again." });
     }
 
@@ -133,7 +137,7 @@ ${JSON.stringify(publicListings)}`;
       }
     });
   } catch (error) {
-    console.error("Could not reach OpenAI for Gather chat.", error);
+    console.error("Could not reach Cloudflare Workers AI for Gather chat.", error);
     return jsonResponse(origin, 502, { error: "Gather’s AI assistant couldn’t connect just now. Please try again." });
   }
 });

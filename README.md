@@ -34,10 +34,10 @@ Row-level security limits profile access to its owner, listings to their host fo
 
 ## Configure the live AI booking assistant
 
-Gather streams conversational replies from OpenAI through a Supabase Edge Function. The browser sends the signed-in user’s access token and public listing details; the OpenAI API key stays in Supabase and is never placed in the website.
+Gather streams replies from Meta’s open-weight Llama 3.2 3B model using Cloudflare Workers AI, through a Supabase Edge Function. Cloudflare currently includes a limited free daily inference allowance; requests stop when the allowance is exhausted on the free plan rather than automatically becoming billable. Limits and pricing can change. Chat messages and public listing details are sent to Cloudflare for inference. The browser never receives the Cloudflare API token.
 
-1. Create an OpenAI API key and configure an OpenAI usage limit for the project. Chat messages are sent to OpenAI to generate answers.
-2. In the Supabase dashboard, add `OPENAI_API_KEY` under **Edge Functions → Secrets**. Do not add the key to `chat.js`, `supabase-config.js`, or any other browser file.
+1. Create a Cloudflare account, open **Workers AI** in the dashboard, choose **Use REST API**, and create a Workers AI API token. Copy the account ID and token. Cloudflare’s [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) describes the current free daily allowance.
+2. In the Supabase dashboard, open **Edge Functions → Secrets** and add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. Do not add either value to `chat.js`, `supabase-config.js`, or any other browser file.
 3. From this project folder, link the Supabase CLI to the Gather project if needed, then deploy the function:
 
    ```powershell
@@ -48,7 +48,7 @@ Gather streams conversational replies from OpenAI through a Supabase Edge Functi
    The function is configured to require a valid Supabase access token. The included CORS allowlist supports Gather’s GitHub Pages site and the local development server at `http://localhost:4173`; add any custom website origin to `supabase/functions/gather-chat/index.ts` before deploying.
 4. Open Gather, sign in or choose demo access, and send a message in the trip assistant. One conversation can help with both booking a stay and preparing a property listing; it infers which task you mean instead of making you choose a mode. For stays, use **Start booking** to open Gather’s date and guest form. For new listings, use **Review listing draft** to open the editable host form; add the required photo and map pin, then review and submit it yourself.
 
-The assistant uses `gpt-4o-mini`, streams replies, and limits each request to ten short chat messages and 450 generated tokens. OpenAI usage may incur charges; set a spending limit in your OpenAI account before enabling it.
+The assistant streams replies and limits each request to ten short chat messages and 450 generated tokens. Cloudflare’s free daily allowance is shared across the account; if it is exhausted, chat resumes after the daily reset. The Llama model is open-weight, but its license is Meta’s Llama Community License, not an unrestricted open-source license.
 
 ## Presentation guest mode
 

@@ -159,10 +159,11 @@
             assert(chatScript.includes("functions/v1/gather-chat") && chatScript.includes("dataset.openOffering"), "The assistant should connect to the secure chat function and provide booking actions for recommended stays");
             assert(edgeResponse.ok, "The Supabase Edge Function should be available");
             const edgeFunction = await edgeResponse.text();
-            assert(edgeFunction.includes('Deno.env.get("OPENAI_API_KEY")') && edgeFunction.includes("api.openai.com/v1/chat/completions") && edgeFunction.includes("stream: true"), "OpenAI should be called from the server with a secret key and streaming enabled");
+            assert(edgeFunction.includes('Deno.env.get("CLOUDFLARE_API_TOKEN")') && edgeFunction.includes('Deno.env.get("CLOUDFLARE_ACCOUNT_ID")') && edgeFunction.includes("api.cloudflare.com/client/v4/accounts/") && edgeFunction.includes("@cf/meta/llama-3.2-3b-instruct") && edgeFunction.includes("stream: true"), "Cloudflare Workers AI should stream the open-weight model from the server using private credentials");
+            assert(edgeFunction.includes("today’s free AI allowance") && edgeFunction.includes("CLOUDFLARE_API_TOKEN") && !edgeFunction.includes("api.openai.com"), "The assistant should explain exhausted free limits and should no longer depend on OpenAI");
             assert(edgeFunction.includes("do not begin by asking whether they want to book or list") && edgeFunction.includes("[[GATHER_LISTING_DRAFT:"), "The assistant should infer booking versus listing intent and prepare listing drafts in the same chat");
             assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes('openOfferingForm();'), "A listing draft should open in Gather’s editable listing form");
-            assert(!markup.includes("OPENAI_API_KEY") && !chatScript.includes("OPENAI_API_KEY"), "The OpenAI API key must never be embedded in browser files");
+            assert(!markup.includes("CLOUDFLARE_API_TOKEN") && !chatScript.includes("CLOUDFLARE_API_TOKEN"), "The Cloudflare API token must never be embedded in browser files");
             assert(styles.includes(".trip-chat {") && styles.includes(".trip-chat-form { grid-template-columns: 1fr; }"), "The assistant should remain usable on mobile-sized screens");
           });
           await testAsync("renders streamed booking and listing actions from a chat reply", async function () {
