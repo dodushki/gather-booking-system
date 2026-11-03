@@ -339,6 +339,12 @@ update public.offerings set image = 'assets/stays/vigan-calle-crisologo.jpg'
 where id = 'vigan-heritage-inn' and image = 'photo-1511818966892-d7d671e672a2';
 update public.offerings set image = 'assets/stays/tagaytay-taal.jpg'
 where id = 'tagaytay-farmstay' and image = 'photo-1500382017468-9049fed747ef';
+update public.offerings set image = 'assets/stays/peninsula-manila.jpg'
+where id = 'luntian-city-hotel' and image = 'assets/stays/makati-skyline.jpg';
+update public.offerings set image = 'assets/stays/hotel-luna-vigan.jpg'
+where id = 'vigan-heritage-inn' and image = 'assets/stays/vigan-calle-crisologo.jpg';
+update public.offerings set image = 'assets/stays/taal-vista-hotel.jpg'
+where id = 'tagaytay-farmstay' and image = 'assets/stays/tagaytay-taal.jpg';
 
 insert into public.offerings (
   id, name, category, description, location, latitude, longitude, price, rating, reviews,

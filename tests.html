@@ -99,6 +99,9 @@
         });
         test("uses locally stored destination photos and upgrades cached sample images", function () {
           assert(api.DEFAULT_OFFERINGS.every((offering) => /^assets\/stays\/[a-z0-9-]+\.jpg$/.test(offering.image)), "Every starter stay should use a local destination photo");
+          assert(api.DEFAULT_OFFERINGS.find((offering) => offering.name === "The Peninsula Manila").image === "assets/stays/peninsula-manila.jpg", "The Peninsula listing should use its property photo");
+          assert(api.DEFAULT_OFFERINGS.find((offering) => offering.name === "Hotel Luna").image === "assets/stays/hotel-luna-vigan.jpg", "Hotel Luna should use its property photo");
+          assert(api.DEFAULT_OFFERINGS.find((offering) => offering.name === "Taal Vista Hotel").image === "assets/stays/taal-vista-hotel.jpg", "Taal Vista should use its property photo");
           const cached = api.withDefaultOfferings([{ ...state.offerings[0], image: "photo-1510414842594-a61c69b5ae57" }]);
           assert(cached.find((offering) => offering.id === "isla-norte").image === "assets/stays/siargao-cloud9.jpg", "Old cached sample photos should migrate to the destination image");
           const hostListing = api.withDefaultOfferings([{ id: "host-place", name: "Host place", image: "https://example.test/host-photo.jpg", days: [], amenities: [] }]);
@@ -361,6 +364,9 @@
             assert(response.ok, "The Supabase schema should be available");
             const schema = await response.text();
             assert(schema.includes("where id = 'isla-norte' and image = 'photo-1510414842594-a61c69b5ae57'"), "The schema should update only an unchanged default photo for existing stays");
+            assert(schema.includes("where id = 'luntian-city-hotel' and image = 'assets/stays/makati-skyline.jpg'"), "The schema should update the Peninsula photo only when its destination photo is unchanged");
+            assert(schema.includes("where id = 'vigan-heritage-inn' and image = 'assets/stays/vigan-calle-crisologo.jpg'"), "The schema should update the Hotel Luna photo only when its destination photo is unchanged");
+            assert(schema.includes("where id = 'tagaytay-farmstay' and image = 'assets/stays/tagaytay-taal.jpg'"), "The schema should update the Taal Vista photo only when its destination photo is unchanged");
             assert(schema.includes("'assets/stays/siargao-cloud9.jpg'"), "The schema should seed the local destination photo");
             assert(api.DEFAULT_OFFERINGS.every((offering) => schema.includes(`('${offering.id}',`)), "The Supabase migration should seed every default listing");
           });
