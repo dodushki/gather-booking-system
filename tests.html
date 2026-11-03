@@ -158,10 +158,61 @@
             assert(markup.includes('id="trip-chat-form"') && markup.includes('id="trip-chat-messages"') && markup.includes("property listing"), "One assistant should support both booking help and property listing");
             assert(markup.includes('data-trip-prompt=') && chatScript.includes('event.key === "Enter"'), "The chat should offer quick prompts and Enter-to-send keyboard interaction");
             assert(engineResponse.ok && markup.includes('src="assistant-engine.js"'), "The purpose-built assistant engine should be included in the website");
-            assert(chatScript.includes("GatherAssistant.respond") && chatScript.includes("GatherSupabase.loadData(null)"), "The assistant should process messages against Gather’s current public stays");
-            assert(!chatScript.includes("functions/v1/gather-chat") && !chatScript.includes("api.cloudflare.com") && !chatScript.includes("api.openai.com"), "Chat should not depend on a paid AI provider or external inference API");
+            const functionResponse = await fetch("./supabase/functions/gather-chat/index.ts");
+            const functionSource = await functionResponse.text();
+            const functionConfig = await (await fetch("./supabase/config.toml")).text();
+            const dataScript = await (await fetch("./supabase-data.js")).text();
+            assert(chatScript.includes("GatherSupabase.chatAssistant") && chatScript.includes("GatherAssistant.startBooking"), "Chat should use a generative assistant and retain Gather’s booking safeguards");
+            assert(functionResponse.ok && functionSource.includes("GATHER_AI_BASE_URL") && functionSource.includes("GATHER_AI_API_KEY") && functionSource.includes("GATHER_AI_MODEL"), "The secure server function should accept an OpenAI-compatible provider configured via server secrets");
+            assert(functionConfig.includes("[functions.gather-chat]") && functionConfig.includes("verify_jwt = true"), "The AI proxy should require an authenticated Gather session");
+            assert(dataScript.includes("functions/v1/gather-chat") && !markup.includes("GATHER_AI_API_KEY"), "The AI provider secret must stay on the server and never appear in the website");
             assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes("window.GatherChatBookingPreferences") && appScript.includes("GatherChatActions"), "Assistant actions should connect to Gather’s booking and editable listing flows");
             assert(styles.includes(".trip-chat {") && styles.includes(".trip-chat-form { grid-template-columns: 1fr; }"), "The assistant should remain usable on mobile-sized screens");
+          });
+          await testAsync("streams real AI replies through the authenticated Supabase proxy", async function () {
+            const source = await (await fetch("./supabase-data.js")).text();
+            const frame = document.createElement("iframe");
+            frame.hidden = true;
+            frame.srcdoc = "<!doctype html><html><body></body></html>";
+            try {
+              await new Promise((resolve) => {
+                frame.onload = resolve;
+                document.body.appendChild(frame);
+              });
+              const chatWindow = frame.contentWindow;
+              chatWindow.GATHER_SUPABASE_CONFIG = { url: "https://gather.example", publishableKey: "public-key" };
+              chatWindow.GatherBooking = { DEFAULT_OFFERINGS: [] };
+              chatWindow.supabase = {
+                createClient: () => ({ auth: { getSession: async () => ({ data: { session: { access_token: "session-token" } }, error: null }) } })
+              };
+              let requestUrl = "";
+              let authorization = "";
+              chatWindow.fetch = async (url, options) => {
+                requestUrl = url;
+                authorization = options.headers.Authorization;
+                const encoder = new chatWindow.TextEncoder();
+                const stream = new chatWindow.ReadableStream({
+                  start(controller) {
+                    controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"Hello "}}]}\n\n'));
+                    controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"there!"}}]}\n\n'));
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                    controller.close();
+                  }
+                });
+                return new chatWindow.Response(stream, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+              };
+              chatWindow.eval(source);
+              const tokens = [];
+              const reply = await chatWindow.GatherSupabase.chatAssistant({
+                messages: [{ role: "user", content: "Hello" }],
+                listings: [],
+                onToken: (token) => tokens.push(token)
+              });
+              assert(requestUrl === "https://gather.example/functions/v1/gather-chat" && authorization === "Bearer session-token", "The model request should use Gather’s authenticated server-side proxy");
+              assert(reply === "Hello there!" && tokens.join("") === reply, "The browser should receive and render incremental model output");
+            } finally {
+              frame.remove();
+            }
           });
           await testAsync("recommends real stays from destination, budget, and guest preferences", function () {
             const data = { offerings: api.DEFAULT_OFFERINGS, bookings: [], unavailableDates: [] };
@@ -221,7 +272,12 @@
               chatWindow.GatherBooking = api;
               chatWindow.GatherAssistant = window.GatherAssistant;
               chatWindow.GatherSupabase = {
-                loadData: async () => ({ offerings: [{ id: "stay-1", name: "Siargao Stay", category: "Island stays", location: "Siargao, Philippines", description: "A sample beach stay", price: 2500, guests: 4, amenities: ["Beach access"], days: [0, 1, 2, 3, 4, 5, 6], minimumNights: 1 }], bookings: [], unavailableDates: [] })
+                loadData: async () => ({ offerings: [{ id: "stay-1", name: "Siargao Stay", category: "Island stays", location: "Siargao, Philippines", description: "A sample beach stay", price: 2500, guests: 4, amenities: ["Beach access"], days: [0, 1, 2, 3, 4, 5, 6], minimumNights: 1 }], bookings: [], unavailableDates: [] }),
+                chatAssistant: async ({ onToken }) => {
+                  const reply = "Hello! I found a stay in Siargao you might like. [[GATHER_STAY:stay-1]]";
+                  onToken(reply);
+                  return reply;
+                }
               };
               let listingOpenCount = 0;
               chatWindow.document.querySelector("#add-offering-button").addEventListener("click", () => { listingOpenCount += 1; });
@@ -230,14 +286,14 @@
               const send = async (text) => {
                 input.value = text;
                 chatWindow.document.querySelector("#trip-chat-form").dispatchEvent(new chatWindow.Event("submit", { bubbles: true, cancelable: true }));
-                for (let attempt = 0; attempt < 50 && chatWindow.document.querySelector(".trip-chat-message.assistant:last-child")?.textContent.includes("Checking Gather"); attempt += 1) {
+                for (let attempt = 0; attempt < 50 && chatWindow.document.querySelector(".trip-chat-message.assistant:last-child")?.textContent.includes("Gather is thinking"); attempt += 1) {
                   await new Promise((resolve) => setTimeout(resolve, 10));
                 }
               };
-              await send("Find a beach stay in Siargao");
+              await send("Hello, find a beach stay in Siargao");
               const assistant = chatWindow.document.querySelector(".trip-chat-message.assistant");
               let actions = chatWindow.document.querySelectorAll(".trip-chat-actions button");
-              assert(assistant.textContent.includes("I found a stay") && actions.length === 1 && actions[0].dataset.bookOffering === "stay-1", "A matching stay should produce a chat booking action");
+              assert(assistant.textContent.includes("Hello!") && assistant.textContent.includes("I found a stay") && actions.length === 1 && actions[0].dataset.bookOffering === "stay-1", `A natural language reply should render as chat and expose a verified Gather stay action (reply: ${assistant.textContent}; actions: ${actions.length})`);
               actions[0].click();
               await new Promise((resolve) => setTimeout(resolve, 0));
               assert(chatWindow.document.querySelector(".trip-chat-message.assistant:last-child").textContent.includes("check-in and check-out dates"), "Selecting a stay should continue the booking conversation in chat");

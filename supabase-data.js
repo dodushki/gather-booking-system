@@ -89,6 +89,67 @@
     return { offerings, bookings, favorites, unavailableDates };
   }
 
+  async function chatAssistant({ messages, listings, onToken }) {
+    const result = throwIfError(await client.auth.getSession());
+    const accessToken = result && result.session && result.session.access_token;
+    if (!accessToken) throw new Error("Continue as a Gather guest or sign in before chatting with the AI assistant.");
+
+    const response = await fetch(`${config.url}/functions/v1/gather-chat`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "apikey": config.publishableKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ messages, listings })
+    });
+    if (!response.ok) {
+      let message = "Gather’s AI assistant couldn’t reply just now. Please try again.";
+      try {
+        const body = await response.json();
+        if (body && typeof body.error === "string") message = body.error;
+      } catch (error) {
+        console.error("Gather’s AI service returned an unreadable error response.", error);
+      }
+      throw new Error(message);
+    }
+
+    if (!response.body) throw new Error("Gather’s AI service returned an empty response.");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let completeReply = "";
+    function consume(event) {
+      const line = event.split(/\r?\n/).find((item) => item.startsWith("data:"));
+      if (!line) return;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") return;
+      let chunk;
+      try {
+        chunk = JSON.parse(payload);
+      } catch (error) {
+        throw new Error("Gather’s AI service returned an invalid chat response.");
+      }
+      if (chunk.error) throw new Error(String(chunk.error));
+      const token = chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content;
+      if (typeof token === "string" && token) {
+        completeReply += token;
+        if (typeof onToken === "function") onToken(token);
+      }
+    }
+    while (true) {
+      const part = await reader.read();
+      buffer += decoder.decode(part.value || new Uint8Array(), { stream: !part.done });
+      const events = buffer.split(/\r?\n\r?\n/);
+      buffer = events.pop() || "";
+      events.forEach(consume);
+      if (part.done) break;
+    }
+    if (buffer.trim()) consume(buffer);
+    if (!completeReply.trim()) throw new Error("Gather’s AI assistant returned an empty reply.");
+    return completeReply;
+  }
+
   async function signUp({ name, email, password, role }) {
     const result = await client.auth.signUp({
       email: email.trim().toLowerCase(),
@@ -195,7 +256,7 @@
   }
 
   window.GatherSupabase = Object.freeze({
-    client, getCurrentProfile, loadData, signUp, signIn, signInAnonymously, signOut, onAuthStateChange,
+    client, getCurrentProfile, loadData, chatAssistant, signUp, signIn, signInAnonymously, signOut, onAuthStateChange,
     createBooking, cancelBooking, saveOffering, uploadListingImage, deleteListingImage,
     deleteOffering, setFavorite
   });

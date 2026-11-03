@@ -34,9 +34,17 @@ Row-level security limits profile access to its owner, listings to their host fo
 
 ## Gather booking assistant
 
-The trip assistant uses Gather’s own lightweight intent, preference, and conversation logic in `assistant-engine.js`; it does not call an AI provider, require an API key, or send chat messages to an external model. It searches current public listings and availability for destinations, stay types, guest capacity, budget, amenities, ISO dates, or common month-and-day dates. Select **Book with Gather** to provide any missing dates or guest count in chat, review the total, and confirm the reservation without leaving the conversation. Gather checks current availability again and asks for explicit confirmation before saving. If you are not signed in, it carries the selected stay into the existing sign-in and booking flow. The assistant can also guide hosts through providing listing details, then open Gather’s editable listing form.
+Gather’s trip chat uses a hosted, streaming model to respond naturally, answer greetings, and help people discover Philippines stays. The current integration targets Cloudflare Workers AI’s OpenAI-compatible chat endpoint with the open-weight Llama 3.2 3B Instruct model. It runs on Cloudflare’s servers, not your PC or your visitors’ devices. The website does not contain the provider API token.
 
-This is a purpose-built, rule-based assistant rather than a general-purpose language model: it cannot answer arbitrary questions or interpret every phrasing. Its logic and matching rules are available in this repository, and you can extend them in `assistant-engine.js`.
+To enable AI replies:
+
+1. In Cloudflare, enable Workers AI and create an API token with permission to run Workers AI models. Copy the account ID from your Cloudflare dashboard.
+2. In the Supabase project’s **Edge Function secrets**, set `GATHER_AI_BASE_URL` to `https://api.cloudflare.com/client/v4/accounts/YOUR_CLOUDFLARE_ACCOUNT_ID/ai/v1`, `GATHER_AI_API_KEY` to your Cloudflare API token, and `GATHER_AI_MODEL` to `@cf/meta/llama-3.2-3b-instruct`. Enter the token only in Supabase secrets; never paste it into chat or commit it to the repository.
+3. From a terminal with the Supabase CLI installed, run `supabase login`, `supabase link --project-ref gcrxsoacrdzyksutwjga`, then `supabase functions deploy gather-chat`.
+
+Cloudflare’s free allowance, quotas, model availability, and terms can change, so AI use is not guaranteed to remain free. Until the function and secrets are configured, Gather will explain that its AI is unavailable.
+
+The function validates chat history, sends only the conversation and public listing details to the configured provider, and streams its response to the browser. Do not send passwords, payment information, or other sensitive details in chat. For booking assistance, the model can recommend only supplied listings; Gather verifies any selected stay against current availability, gathers dates and guests in chat, shows the total, and requires explicit confirmation before saving through Gather’s booking service. The model cannot create or confirm bookings on its own. Listing preparation continues to use Gather’s guided draft flow and editable listing form.
 
 ## Presentation guest mode
 

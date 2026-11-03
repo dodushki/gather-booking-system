@@ -9,6 +9,7 @@
 
   let isSending = false;
   let conversationState = {};
+  let conversationMessages = [];
 
   function addMessage(role, text, isError) {
     const message = document.createElement("div");
@@ -21,6 +22,7 @@
 
   function resetConversation() {
     conversationState = {};
+    conversationMessages = [];
     messagesElement.replaceChildren();
     addMessage("assistant", "Hi! Tell me where you’d like to go, when you’re traveling, or what kind of stay you have in mind. I can help you choose a place and book it right here.");
     if (promptSuggestions) promptSuggestions.hidden = false;
@@ -38,6 +40,16 @@
       form.requestSubmit();
     }
   });
+
+  function parseAssistantReply(text, offerings) {
+    const stays = [];
+    const reply = text.replace(/\[\[GATHER_STAY:([^\]]+)\]\]/g, (marker, id) => {
+      const offering = offerings.find((item) => String(item.id) === id.trim());
+      if (offering && !stays.some((stay) => stay.id === offering.id)) stays.push(offering);
+      return "";
+    }).replace(/\[\[GATHER_LISTING_DRAFT:[\s\S]*?\]\]/g, "").trim();
+    return { reply, stays: stays.slice(0, 3) };
+  }
 
   function addAssistantActions(message, result) {
     if (!result.stays.length && !result.listingDraft && !result.bookingReady) return;
@@ -62,6 +74,7 @@
           addMessage("assistant", `I couldn’t start that booking. ${error.message || "Please try again."}`, true);
           button.disabled = false;
         }
+
       });
       actions.appendChild(button);
     });
@@ -122,14 +135,40 @@
     submitButton.disabled = true;
     input.disabled = true;
     addMessage("user", prompt);
-    const assistantMessage = addMessage("assistant", "Checking Gather’s current stays…");
+    const assistantMessage = addMessage("assistant", "Gather is thinking…");
 
     try {
       const data = await window.GatherSupabase.loadData(null);
-      const result = window.GatherAssistant.respond(prompt, data, conversationState);
-      conversationState = result.state;
-      assistantMessage.textContent = result.reply;
-      addAssistantActions(assistantMessage, result);
+      if (conversationState.bookingDraft || conversationState.mode === "listing" ||
+          window.GatherAssistant.respond(prompt, data, conversationState).state.mode === "listing") {
+        const result = window.GatherAssistant.respond(prompt, data, conversationState);
+        conversationState = result.state;
+        assistantMessage.textContent = result.reply;
+        addAssistantActions(assistantMessage, result);
+      } else {
+        const nextMessages = conversationMessages.concat({ role: "user", content: prompt }).slice(-10);
+        let streamedText = "";
+        const response = await window.GatherSupabase.chatAssistant({
+          messages: nextMessages,
+          listings: data.offerings,
+          onToken: (token) => {
+            streamedText += token;
+            assistantMessage.textContent = streamedText.replace(/\[\[GATHER_[A-Z_]*:[^\]]*$/, "").trim();
+            messagesElement.scrollTop = messagesElement.scrollHeight;
+          }
+        });
+        const parsed = parseAssistantReply(response, data.offerings || []);
+        if (!parsed.reply && !parsed.stays.length) throw new Error("Gather’s AI assistant didn’t return a usable reply.");
+        assistantMessage.textContent = parsed.reply;
+        const assistantHistory = parsed.reply || "I found a Gather stay that may suit you.";
+        conversationMessages = nextMessages.concat({ role: "assistant", content: assistantHistory }).slice(-10);
+        addAssistantActions(assistantMessage, {
+          ...parsed,
+          listingDraft: null,
+          bookingReady: null,
+          state: { ...conversationState, mode: "booking", preferences: conversationState.preferences || {} }
+        });
+      }
       input.value = "";
     } catch (error) {
       console.error("Gather could not process the assistant request.", error);
