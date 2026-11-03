@@ -219,6 +219,22 @@
     return fromBooking(throwIfError(result));
   }
 
+  async function updateBookingAdmin(booking) {
+    const result = await client.rpc("update_booking_admin", {
+      p_booking_id: booking.bookingId,
+      p_offering_id: booking.offeringId,
+      p_checkin: booking.checkin,
+      p_checkout: booking.checkout,
+      p_guests: Number(booking.guests),
+      p_price: Number(booking.price),
+      p_status: booking.status,
+      p_guest_name: booking.guestName,
+      p_guest_email: booking.guestEmail || null,
+      p_notes: booking.notes || ""
+    });
+    return fromBooking(throwIfError(result));
+  }
+
   async function saveOffering(offering) {
     const result = await client.from("offerings").upsert(toOffering(offering)).select("*").single();
     return fromOffering(throwIfError(result));
@@ -257,7 +273,7 @@
 
   window.GatherSupabase = Object.freeze({
     client, getCurrentProfile, loadData, chatAssistant, signUp, signIn, signInAnonymously, signOut, onAuthStateChange,
-    createBooking, cancelBooking, saveOffering, uploadListingImage, deleteListingImage,
+    createBooking, cancelBooking, updateBookingAdmin, saveOffering, uploadListingImage, deleteListingImage,
     deleteOffering, setFavorite
   });
 })();

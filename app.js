@@ -184,7 +184,7 @@
       openAuthModal("signin", "guest", { type: "bookings" });
       return;
     }
-    if (tab === "manage" && (!currentUser || currentUser.role !== "host")) {
+    if (tab === "manage" && (!currentUser || !["host", "admin"].includes(currentUser.role))) {
       openAuthModal(currentUser ? "signup" : "signup", "host", { type: "manage" });
       return;
     }
@@ -265,18 +265,23 @@
   function renderAccountButton() {
     const button = $("#account-button");
     if (!currentUser) {
+      $("#manage-nav-label").textContent = "List your property";
       $("#account-button-label").textContent = "Sign in";
       $(".profile-dot", button).textContent = "G";
       button.setAttribute("aria-label", "Sign in or create a Gather account");
       $("#account-dropdown").innerHTML = "";
       return;
     }
+    $("#manage-nav-label").textContent = currentUser.role === "admin" ? "Admin dashboard" : "List your property";
     $("#account-button-label").textContent = currentUser.name.split(/\s+/)[0];
     $(".profile-dot", button).textContent = currentUser.name.trim().charAt(0).toUpperCase();
     button.setAttribute("aria-label", `Account menu for ${currentUser.name}`);
+    const roleLabel = currentUser.role === "admin" ? "GATHER ADMIN" : currentUser.role === "host" ? "GATHER HOST" : "GATHER GUEST";
+    const accountRoute = currentUser.role === "admin" || currentUser.role === "host" ? "manage" : "bookings";
+    const accountAction = currentUser.role === "admin" ? "Admin dashboard" : currentUser.role === "host" ? "Your host dashboard" : "Your trips";
     $("#account-dropdown").innerHTML = `
-      <div class="account-menu-heading"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><small>${currentUser.isAnonymous ? "Guest session" : escapeHtml(currentUser.email)}</small><span class="account-role">${currentUser.role === "host" ? "GATHER HOST" : "GATHER GUEST"}</span></div></div>
-      <button type="button" class="account-menu-link" data-account-action="${currentUser.role === "host" ? "manage" : "bookings"}">${currentUser.role === "host" ? "Your host dashboard" : "Your trips"} <span>→</span></button>
+      <div class="account-menu-heading"><span class="profile-dot">${escapeHtml(currentUser.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(currentUser.name)}</strong><small>${currentUser.isAnonymous ? "Guest session" : escapeHtml(currentUser.email)}</small><span class="account-role">${roleLabel}</span></div></div>
+      <button type="button" class="account-menu-link" data-account-action="${accountRoute}">${accountAction} <span>→</span></button>
       <button type="button" class="account-menu-link signout-link" data-account-action="signout">Sign out</button>`;
   }
 
@@ -340,8 +345,8 @@
       } else {
         account = await GatherData.signIn({ email: formData.get("email"), password: formData.get("password") });
       }
-      if (authIntent && authIntent.type === "manage" && account.role !== "host") {
-        throw new Error("This part of Gather is for hosts. Create a host account or sign in with one.");
+      if (authIntent && authIntent.type === "manage" && !["host", "admin"].includes(account.role)) {
+        throw new Error("This part of Gather is for hosts and administrators. Create a host account or sign in with one.");
       }
       const intent = authIntent;
       authIntent = null;
@@ -355,7 +360,7 @@
         openOfferingForm();
       }
       else if (intent && intent.type === "bookings") navigate("bookings");
-      else if (account.role === "host") navigate("manage");
+      else if (account.role === "host" || account.role === "admin") navigate("manage");
       else navigate("home");
     } catch (caught) {
       error.textContent = caught.message;
@@ -682,7 +687,12 @@
     const bounds = countryBoundary && countryBoundary.getBounds().isValid()
       ? countryBoundary.getBounds()
       : window.L.latLngBounds(philippinesBounds);
-    stayMap.fitBounds(bounds.pad(0.035), { padding: [10, 10], maxZoom: 5, animate: false });
+    const expanded = $("#stay-results-layout").classList.contains("map-expanded");
+    stayMap.fitBounds(bounds.pad(expanded ? 0.015 : 0.035), {
+      padding: expanded ? [24, 24] : [10, 10],
+      maxZoom: expanded ? 6 : 5,
+      animate: false
+    });
   }
 
   function renderBookings() {
@@ -706,9 +716,26 @@
   }
 
   function renderManager() {
-    const offerings = currentUser && currentUser.role === "host"
-      ? state.offerings.filter((offering) => offering.ownerId === currentUser.id)
+    const isAdmin = currentUser && currentUser.role === "admin";
+    const offerings = isAdmin
+      ? state.offerings
+      : currentUser && currentUser.role === "host"
+        ? state.offerings.filter((offering) => offering.ownerId === currentUser.id)
       : [];
+    $("#manage-title").innerHTML = isAdmin ? "Gather <em>admin.</em>" : "Your place, <em>their story.</em>";
+    $("#manage-eyebrow").textContent = isAdmin ? "SITE-WIDE LISTING AND BOOKING CONTROLS" : "FOR PEOPLE WHO HAVE A PLACE TO SHARE";
+    $("#manage-intro-copy").textContent = isAdmin
+      ? "Edit every listing and booking detail across Gather."
+      : "Manage your space, set your availability, welcome someone new.";
+    $("#manage-add-label").textContent = isAdmin ? "Add listing" : "Add your place";
+    $("#manage-panel-label").textContent = isAdmin ? "ALL GATHER LISTINGS" : "YOUR LITTLE CORNER OF GATHER";
+    $("#manage-panel-title").textContent = isAdmin ? "All listings" : "Places you host";
+    $("#manage-note").hidden = isAdmin;
+    $("#host-reservations-title").innerHTML = isAdmin ? "Booking <em>management.</em>" : "Booking <em>requests.</em>";
+    $("#host-reservations-kicker").textContent = isAdmin ? "ALL GATHER BOOKING RECORDS" : "GUEST INTEREST IN YOUR PLACES";
+    $("#host-request-note").textContent = isAdmin
+      ? "Edit listing, guest, date, rate, and booking-status details. Changes are saved to the shared Gather database."
+      : "Requests are not sent to guests or confirmed in Gather. Contact them directly to verify dates, rates, and terms.";
     $("#offering-count").textContent = `${offerings.length} ${offerings.length === 1 ? "place" : "places"}`;
     $("#booking-count").textContent = String(currentUser
       ? state.bookings.filter((booking) => booking.accountId === currentUser.id && booking.status !== "cancelled").length
@@ -718,12 +745,104 @@
     `).join("") : `<div class="manage-empty"><p>No stays yet. Add a place and welcome your first guests.</p></div>`;
     const hostIds = new Set(offerings.map((offering) => offering.id));
     const incoming = currentUser
-      ? state.bookings.filter((booking) => hostIds.has(booking.offeringId)).sort((a, b) => a.checkin.localeCompare(b.checkin))
+      ? (isAdmin ? state.bookings : state.bookings.filter((booking) => hostIds.has(booking.offeringId))).sort((a, b) => a.checkin.localeCompare(b.checkin))
       : [];
+    $("#host-booking-empty").textContent = isAdmin ? "No booking records yet." : "New booking requests for your places will show up here.";
     $("#host-booking-empty").classList.toggle("hidden", incoming.length > 0);
     $("#host-booking-list").innerHTML = incoming.map((booking) => `
-      <article class="host-booking"><div><span class="booking-category">${escapeHtml(booking.status)} · ${Number(booking.guests)} ${Number(booking.guests) === 1 ? "guest" : "guests"}</span><h3>${escapeHtml(booking.offeringName)}</h3><p>${escapeHtml(stayDates(booking.checkin, booking.checkout))} · ${Number(booking.nights)} nights</p><p>Guest: ${escapeHtml(booking.name)}${booking.email ? ` · ${escapeHtml(booking.email)}` : " · Presentation guest"}</p></div><strong>${money(booking.total)}</strong></article>
+      <article class="host-booking"><div><span class="booking-category">${escapeHtml(booking.status)} · ${Number(booking.guests)} ${Number(booking.guests) === 1 ? "guest" : "guests"}</span><h3>${escapeHtml(booking.offeringName)}</h3><p>${escapeHtml(stayDates(booking.checkin, booking.checkout))} · ${Number(booking.nights)} nights</p><p>Guest: ${escapeHtml(booking.name)}${booking.email ? ` · ${escapeHtml(booking.email)}` : ""}</p></div><strong>${money(booking.total)}</strong>${isAdmin ? `<button type="button" class="button button-outline booking-admin-edit" data-edit-booking="${escapeHtml(booking.id)}">Edit details</button>` : ""}</article>
     `).join("");
+  }
+
+  function openAdminBookingForm(bookingId) {
+    if (!currentUser || currentUser.role !== "admin") return;
+    const booking = state.bookings.find((item) => item.id === bookingId);
+    if (!booking) return;
+    const options = state.offerings.map((offering) =>
+      `<option value="${escapeHtml(offering.id)}"${offering.id === booking.offeringId ? " selected" : ""}>${escapeHtml(offering.name)} · ${escapeHtml(offering.location)}</option>`
+    ).join("");
+    elements.modalContent.innerHTML = `
+      <div class="modal-heading form-modal-heading"><span class="modal-kicker">GATHER ADMIN · BOOKING DETAILS</span><h2 id="modal-title">Edit <em>booking.</em></h2><p>Changes update the shared booking record and its stay details.</p></div>
+      <form class="offering-form admin-booking-form" id="admin-booking-form">
+        <label>Stay<select name="offeringId" required>${options}</select></label>
+        <div class="form-grid"><label>Check in<input name="checkin" type="date" value="${escapeHtml(booking.checkin)}" required></label><label>Check out<input name="checkout" type="date" value="${escapeHtml(booking.checkout)}" required></label></div>
+        <div class="form-grid"><label>Guests<input name="guests" type="number" min="1" max="20" value="${Number(booking.guests)}" required></label><label>Price per night (PHP)<input name="price" type="number" min="100" max="999999" step="100" value="${Number(booking.price)}" required></label></div>
+        <label>Booking status<select name="status"><option value="pending"${booking.status === "pending" ? " selected" : ""}>Pending</option><option value="confirmed"${booking.status === "confirmed" ? " selected" : ""}>Confirmed</option><option value="cancelled"${booking.status === "cancelled" ? " selected" : ""}>Cancelled</option></select></label>
+        <div class="form-grid"><label>Guest name<input name="guestName" value="${escapeHtml(booking.name)}" maxlength="80" required></label><label>Guest email<input name="guestEmail" type="email" value="${escapeHtml(booking.email || "")}" maxlength="254"></label></div>
+        <label>Guest notes<textarea name="notes" rows="3" maxlength="400">${escapeHtml(booking.notes || "")}</textarea></label>
+        <p class="form-error hidden" id="form-error" role="alert"></p>
+        <div class="confirm-row"><span class="form-hint">${escapeHtml(booking.id)}</span><button class="button button-dark" type="submit">Save booking <span aria-hidden="true">→</span></button></div>
+      </form>`;
+    elements.modal.classList.remove("auth-modal");
+    elements.modal.classList.remove("auth-backdrop");
+    elements.modal.classList.remove("hidden");
+    elements.modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    const form = $("#admin-booking-form");
+    form.dataset.bookingId = booking.id;
+    const staySelect = $('[name="offeringId"]', form);
+    staySelect.addEventListener("change", () => {
+      const selectedOffering = state.offerings.find((item) => item.id === staySelect.value);
+      if (!selectedOffering) return;
+      const guestCount = $('[name="guests"]', form);
+      guestCount.max = String(selectedOffering.guests);
+      guestCount.value = String(Math.min(Number(guestCount.value), Number(selectedOffering.guests)));
+      $('[name="price"]', form).value = String(selectedOffering.price);
+    });
+    form.addEventListener("submit", submitAdminBooking);
+    $('[name="offeringId"]', form).focus();
+  }
+
+  async function submitAdminBooking(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const offering = state.offerings.find((item) => item.id === data.get("offeringId"));
+    if (!offering || !currentUser || currentUser.role !== "admin") return;
+    const error = $("#form-error");
+    const updated = {
+      bookingId: form.dataset.bookingId,
+      offeringId: offering.id,
+      checkin: data.get("checkin"),
+      checkout: data.get("checkout"),
+      guests: Number(data.get("guests")),
+      price: Number(data.get("price")),
+      status: data.get("status"),
+      guestName: data.get("guestName").trim(),
+      guestEmail: data.get("guestEmail").trim(),
+      notes: data.get("notes").trim()
+    };
+    if (!updated.bookingId) {
+      error.textContent = "This booking could not be found.";
+      error.classList.remove("hidden");
+      return;
+    }
+    const submit = $('button[type="submit"]', form);
+    submit.disabled = true;
+    error.classList.add("hidden");
+    try {
+      const confirmed = await requestConfirmation({
+        title: "Save booking changes?",
+        message: `Update the booking for ${updated.guestName} at ${offering.name}? The stay total will be recalculated from the dates and nightly rate.`,
+        confirmLabel: "Save changes"
+      });
+      if (!confirmed) return;
+      const saved = await GatherData.updateBookingAdmin(updated);
+      const index = state.bookings.findIndex((item) => item.id === saved.id);
+      if (index >= 0) state.bookings[index] = saved;
+      closeModal();
+      renderAll();
+      refreshSharedData().catch((refreshError) => {
+        console.error("Booking was saved, but shared data could not be refreshed.", refreshError);
+        showToast(`Booking saved, but refresh failed: ${refreshError.message}`);
+      });
+      showToast("Booking details updated.");
+    } catch (caught) {
+      error.textContent = caught.message;
+      error.classList.remove("hidden");
+    } finally {
+      if (!elements.modal.classList.contains("hidden")) submit.disabled = false;
+    }
   }
 
   function dateInputsMarkup(checkin, checkout, prefix) {
@@ -952,7 +1071,7 @@
   }
 
   function openOfferingForm(offering) {
-    if (!currentUser || currentUser.role !== "host") {
+    if (!currentUser || !["host", "admin"].includes(currentUser.role)) {
       openAuthModal("signin", "host", { type: "manage" });
       return;
     }
@@ -962,7 +1081,8 @@
     const chatDraft = window.GatherChatListingDraft;
     const value = offering || { name: "", category: "Island stays", description: "", location: "", price: 5000, rating: 4.6, reviews: 0, guests: 2, bedrooms: 1, bathrooms: 1, icon: "⌂", image: "photo-1510414842594-a61c69b5ae57", badge: "A favorite", amenities: [], days: [0, 1, 2, 3, 4, 5, 6], minimumNights: 1, ...(chatDraft || {}) };
     if (chatDraft) window.GatherChatListingDraft = null;
-    elements.modalContent.innerHTML = `<div class="modal-heading form-modal-heading"><span class="modal-kicker">GATHER HOSTS · ${offering ? "YOUR LISTING" : "A NEW PLACE"}</span><h2 id="modal-title">${offering ? "A little" : "Put your place"} <em>${offering ? "update." : "on the map."}</em></h2><p>Share the details guests need to find their way to you.</p></div>
+    const listingLabel = currentUser.role === "admin" ? "LISTING DETAILS" : offering ? "YOUR LISTING" : "A NEW PLACE";
+    elements.modalContent.innerHTML = `<div class="modal-heading form-modal-heading"><span class="modal-kicker">GATHER ${currentUser.role === "admin" ? "ADMIN" : "HOSTS"} · ${listingLabel}</span><h2 id="modal-title">${offering ? "A little" : "Put your place"} <em>${offering ? "update." : "on the map."}</em></h2><p>Share the details guests need to find their way to you.</p></div>
     <form class="offering-form" id="offering-form"><div class="form-grid"><label>Place name<input name="name" required maxlength="80" value="${escapeHtml(value.name)}" placeholder="e.g. A Little House in the Islands"></label><label>Stay type<select name="category">${["Island stays", "Beachfront stays", "Mountain escapes", "City hotels", "Serviced apartments", "Heritage inns", "Farm stays", "City hideaways", "Nature retreats", "Other"].map((item) => `<option${item === value.category ? " selected" : ""}>${item}</option>`).join("")}</select></label></div>
       <label>Description<textarea name="description" rows="2" required maxlength="240" placeholder="What makes it feel like yours?">${escapeHtml(value.description)}</textarea></label>
       <label>Location<input name="location" required maxlength="100" value="${escapeHtml(value.location)}" placeholder="Island, town, province"></label>
@@ -1038,7 +1158,7 @@
     }
     const previous = state.offerings.find((item) => item.id === editingOfferingId);
     const updated = {
-      id: editingOfferingId || `stay-${window.crypto.randomUUID()}`, ownerId: currentUser.id, name: data.get("name").trim(), category: data.get("category"),
+      id: editingOfferingId || `stay-${window.crypto.randomUUID()}`, ownerId: previous ? previous.ownerId : currentUser.id, name: data.get("name").trim(), category: data.get("category"),
       description: data.get("description").trim(), location: data.get("location").trim(), image: previous ? previous.image : "", latitude, longitude,
       price: Number(data.get("price")), guests: Number(data.get("guests")), bedrooms: Number(data.get("bedrooms")),
       bathrooms: Number(data.get("bathrooms")), minimumNights: Number(data.get("minimumNights")), rating: Number(data.get("rating")),
@@ -1090,7 +1210,7 @@
 
   async function removeOffering(id) {
     const offering = state.offerings.find((item) => item.id === id);
-    if (!offering || !currentUser || offering.ownerId !== currentUser.id) return;
+    if (!offering || !currentUser || (currentUser.role !== "admin" && offering.ownerId !== currentUser.id)) return;
     const activeBookings = state.bookings.filter((booking) => booking.offeringId === id && booking.status !== "cancelled");
     const confirmed = await requestConfirmation({
       title: "Remove this listing?",
@@ -1245,7 +1365,10 @@
     $("#map-heading-kicker").textContent = expanded ? "INTERACTIVE MAP" : "MAP PREVIEW";
     $("#stay-map-title").textContent = expanded ? "Stays near your search" : "Explore the area";
     window.setTimeout(() => {
-      if (stayMap) stayMap.invalidateSize({ pan: false });
+      if (stayMap) {
+        stayMap.invalidateSize({ pan: false });
+        fitCountryBounds();
+      }
     }, 250);
   }
   $("#expand-map").addEventListener("click", () => {
@@ -1369,9 +1492,12 @@
     const edit = event.target.closest("[data-edit-offering]");
     if (edit) {
       const offeringToEdit = state.offerings.find((item) => item.id === edit.dataset.editOffering);
-      if (offeringToEdit && currentUser && offeringToEdit.ownerId === currentUser.id) return openOfferingForm(offeringToEdit);
+      if (offeringToEdit && currentUser &&
+        (currentUser.role === "admin" || offeringToEdit.ownerId === currentUser.id)) return openOfferingForm(offeringToEdit);
       return;
     }
+    const editBooking = event.target.closest("[data-edit-booking]");
+    if (editBooking) return openAdminBookingForm(editBooking.dataset.editBooking);
     const remove = event.target.closest("[data-delete-offering]");
     if (remove) return removeOffering(remove.dataset.deleteOffering);
     if (event.target.closest("#add-offering-button")) return openOfferingForm();

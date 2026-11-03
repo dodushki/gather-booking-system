@@ -162,6 +162,7 @@
             const appScript = await (await fetch("./app.js")).text();
             const styles = await (await fetch("./styles.css")).text();
             const chatScript = await (await fetch("./chat.js")).text();
+            const schema = await (await fetch("./supabase-schema.sql")).text();
             const engineResponse = await fetch("./assistant-engine.js");
             assert(markup.includes('id="trip-chat-form"') && markup.includes('id="trip-chat-messages"') && markup.includes("property listing"), "One assistant should support both booking help and property listing");
             assert(markup.includes('data-trip-prompt=') && chatScript.includes('event.key === "Enter"'), "The chat should offer quick prompts and Enter-to-send keyboard interaction");
@@ -189,6 +190,12 @@
             assert(markup.includes("Request to book") || appScript.includes("Request to book"), "Guests should see a sign-in-gated request-to-book flow");
             assert(appScript.includes('if (!currentUser || currentUser.isAnonymous)') && appScript.includes('openAuthModal("signup", "guest", { type: "booking", offeringId })'), "An account should be required only when a guest starts a booking request");
             assert(styles.includes(".stay-filter-sidebar .category-row { flex-direction: column;") && styles.includes(".stay-filter-sidebar { position: static; width: 100%; max-width: 100%;") && styles.includes(".stay-results-layout { height: auto; min-height: 0; display: flex; flex-direction: column;") && styles.includes(".offering-card.scroll-reveal"), "Categories should stack on the left, fit mobile viewports, and listings should animate into view");
+            assert(appScript.includes("maxZoom: expanded ? 6 : 5") && appScript.includes("stayMap.invalidateSize({ pan: false });") && appScript.includes("fitCountryBounds();"), "The expanded map should refit after resizing and allow a closer country view");
+            assert(schema.includes("role in ('guest', 'host', 'admin')") && schema.includes("case when requested_role = 'host' then 'host' else 'guest' end"), "Only trusted database promotion can grant the admin profile role");
+            assert(schema.includes("public.is_gather_admin()") && schema.includes("update_booking_admin") && schema.includes("if not public.is_gather_admin() then"), "Admin booking access should be checked by the database rather than only the interface");
+            assert(schema.includes("or public.is_gather_admin()") && schema.includes("perform pg_advisory_xact_lock(hashtext(p_offering_id))"), "Administrators should manage all listings and booking conflict checks should be serialized");
+            assert(appScript.includes('currentUser.role === "admin"') && appScript.includes('data-edit-booking="${escapeHtml(booking.id)}"') && appScript.includes('id="admin-booking-form"') && dataScript.includes('client.rpc("update_booking_admin"'), "The admin dashboard should edit bookings through the protected database function");
+            assert(styles.includes(".booking-admin-edit") && styles.includes(".host-booking { align-items: start; flex-wrap: wrap;"), "Admin booking controls should remain usable on narrow screens");
           });
           await testAsync("streams real AI replies through the authenticated Supabase proxy", async function () {
             const source = await (await fetch("./supabase-data.js")).text();

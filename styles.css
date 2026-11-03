@@ -375,6 +375,8 @@ body.map-open .floating-chat-widget { visibility: hidden; }
 .host-reservations .section-heading h2 { font-size: 26px; }
 .host-request-note { margin: -4px 0 14px; color: #738077; font-size: 12px; line-height: 1.6; }
 .host-booking { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid #e5ebe6; border-radius: 4px; padding: 15px 18px; background: #fff; }
+.host-booking > div { min-width: 0; }
+.booking-admin-edit { flex: 0 0 auto; min-height: 36px; padding: 8px 11px; font-size: 10px; white-space: nowrap; }
 .host-booking + .host-booking { margin-top: 9px; }
 .host-booking h3 { margin: 4px 0; font-family: var(--serif); font-size: 17px; font-weight: 500; }
 .host-booking p { margin: 3px 0 0; color: #738077; font-size: 10px; }
@@ -626,7 +628,9 @@ body.map-open .floating-chat-widget { visibility: hidden; }
   .manage-note h3 { max-width: 300px; margin-top: 9px; font-size: 20px; }
   .manage-note p { max-width: 350px; margin-bottom: 15px; }
   .host-reservations { margin-top: 28px; }
-  .host-booking { align-items: start; padding: 12px; }
+  .host-booking { align-items: start; flex-wrap: wrap; gap: 10px; padding: 12px; }
+  .host-booking > div { flex: 1 1 100%; }
+  .booking-admin-edit { margin-left: auto; }
   .host-booking > strong { font-size: 14px; }
   .booking-card { grid-template-columns: 93px 1fr; gap: 12px; padding: 10px; }
   .booking-photo { width: 93px; height: 90px; }

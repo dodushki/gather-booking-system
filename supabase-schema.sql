@@ -7,6 +7,9 @@ create table if not exists public.profiles (
   role text not null check (role in ('guest', 'host')),
   created_at timestamptz not null default now()
 );
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles
+  add constraint profiles_role_check check (role in ('guest', 'host', 'admin'));
 
 create table if not exists public.offerings (
   id text primary key,
@@ -110,6 +113,21 @@ create trigger on_gather_user_created
   after insert on auth.users
   for each row execute function public.create_gather_profile();
 
+create or replace function public.is_gather_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and role = 'admin'
+  );
+$$;
+revoke all on function public.is_gather_admin() from public;
+grant execute on function public.is_gather_admin() to authenticated;
+
 alter table public.profiles enable row level security;
 alter table public.offerings enable row level security;
 alter table public.bookings enable row level security;
@@ -118,7 +136,7 @@ alter table public.favorites enable row level security;
 drop policy if exists "Profiles are visible to their owner" on public.profiles;
 create policy "Profiles are visible to their owner"
   on public.profiles for select to authenticated
-  using (id = (select auth.uid()));
+  using (id = (select auth.uid()) or public.is_gather_admin());
 
 drop policy if exists "Offerings are publicly readable" on public.offerings;
 create policy "Offerings are publicly readable"
@@ -128,20 +146,23 @@ drop policy if exists "Hosts can create their own offerings" on public.offerings
 create policy "Hosts can create their own offerings"
   on public.offerings for insert to authenticated
   with check (
-    owner_id = (select auth.uid())
-    and exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'host')
+    public.is_gather_admin()
+    or (
+      owner_id = (select auth.uid())
+      and exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'host')
+    )
   );
 
 drop policy if exists "Hosts can update their own offerings" on public.offerings;
 create policy "Hosts can update their own offerings"
   on public.offerings for update to authenticated
-  using (owner_id = (select auth.uid()))
-  with check (owner_id = (select auth.uid()));
+  using (owner_id = (select auth.uid()) or public.is_gather_admin())
+  with check (owner_id = (select auth.uid()) or public.is_gather_admin());
 
 drop policy if exists "Hosts can remove their own offerings" on public.offerings;
 create policy "Hosts can remove their own offerings"
   on public.offerings for delete to authenticated
-  using (owner_id = (select auth.uid()));
+  using (owner_id = (select auth.uid()) or public.is_gather_admin());
 
 drop policy if exists "Guests and hosts can read related bookings" on public.bookings;
 create policy "Guests and hosts can read related bookings"
@@ -149,6 +170,7 @@ create policy "Guests and hosts can read related bookings"
   using (
     guest_id = (select auth.uid())
     or host_id = (select auth.uid())
+    or public.is_gather_admin()
   );
 
 drop policy if exists "Users can read their own favorites" on public.favorites;
@@ -186,7 +208,7 @@ create policy "Hosts can upload Gather listing photos"
     and (storage.foldername(name))[1] = (select auth.uid())::text
     and exists (
       select 1 from public.profiles p
-      where p.id = (select auth.uid()) and p.role = 'host'
+      where p.id = (select auth.uid()) and p.role in ('host', 'admin')
     )
   );
 
@@ -195,7 +217,10 @@ create policy "Hosts can remove their Gather listing photos"
   on storage.objects for delete to authenticated
   using (
     bucket_id = 'listing-photos'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and (
+      (storage.foldername(name))[1] = (select auth.uid())::text
+      or public.is_gather_admin()
+    )
   );
 
 create or replace function public.get_unavailable_dates()
@@ -280,9 +305,99 @@ declare
 begin
   update public.bookings
   set status = 'cancelled'
-  where id = p_booking_id and guest_id = auth.uid() and status in ('pending', 'confirmed')
+  where id = p_booking_id
+    and (guest_id = auth.uid() or public.is_gather_admin())
+    and status in ('pending', 'confirmed')
   returning * into v_booking;
   if not found then raise exception 'This reservation could not be cancelled.'; end if;
+  return v_booking;
+end;
+$$;
+
+create or replace function public.update_booking_admin(
+  p_booking_id uuid,
+  p_offering_id text,
+  p_checkin date,
+  p_checkout date,
+  p_guests integer,
+  p_price integer,
+  p_status text,
+  p_guest_name text,
+  p_guest_email text,
+  p_notes text default ''
+)
+returns public.bookings
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_booking public.bookings;
+  v_offering public.offerings;
+  v_nights integer;
+begin
+  if not public.is_gather_admin() then
+    raise exception 'Only a Gather administrator can edit booking details.';
+  end if;
+  if p_status is null or p_status not in ('pending', 'confirmed', 'cancelled') then
+    raise exception 'Choose a valid booking status.';
+  end if;
+  if p_checkin is null or p_checkout is null or p_checkout <= p_checkin then
+    raise exception 'Choose valid check-in and check-out dates.';
+  end if;
+  if p_status <> 'cancelled' and p_checkin < (now() at time zone 'Asia/Manila')::date then
+    raise exception 'Active bookings must start today or later.';
+  end if;
+  if p_guests is null or p_guests < 1 or p_price is null or p_price < 100 or p_price > 999999 then
+    raise exception 'Check the guest count and nightly price.';
+  end if;
+  if char_length(trim(coalesce(p_guest_name, ''))) not between 2 and 80 then
+    raise exception 'Guest name must be between 2 and 80 characters.';
+  end if;
+  if char_length(coalesce(p_guest_email, '')) > 254 or char_length(coalesce(p_notes, '')) > 400 then
+    raise exception 'Guest email or notes are too long.';
+  end if;
+  select * into v_offering from public.offerings where id = p_offering_id;
+  if not found then raise exception 'Choose an existing Gather listing.'; end if;
+  if p_guests > v_offering.guests then raise exception 'The selected listing cannot accommodate that many guests.'; end if;
+  v_nights := p_checkout - p_checkin;
+  if p_status <> 'cancelled' then
+    if v_nights < v_offering.minimum_nights then raise exception 'This listing requires at least % nights.', v_offering.minimum_nights; end if;
+    if not (extract(dow from p_checkin)::smallint = any(v_offering.days)) then
+      raise exception 'The listing is not available for check-in on that day.';
+    end if;
+  end if;
+  perform pg_advisory_xact_lock(hashtext(p_offering_id));
+  if p_status = 'confirmed' and exists (
+    select 1 from public.bookings b
+    where b.id <> p_booking_id
+      and b.offering_id = p_offering_id
+      and b.status = 'confirmed'
+      and b.checkin < p_checkout
+      and b.checkout > p_checkin
+  ) then
+    raise exception 'This listing has another confirmed booking during those dates.';
+  end if;
+  update public.bookings
+  set offering_id = v_offering.id,
+      host_id = v_offering.owner_id,
+      offering_name = v_offering.name,
+      category = v_offering.category,
+      location = v_offering.location,
+      image = v_offering.image,
+      checkin = p_checkin,
+      checkout = p_checkout,
+      nights = v_nights,
+      guests = p_guests,
+      price = p_price,
+      total = p_price * v_nights,
+      guest_name = trim(p_guest_name),
+      guest_email = nullif(lower(trim(coalesce(p_guest_email, ''))), ''),
+      notes = left(coalesce(p_notes, ''), 400),
+      status = p_status
+  where id = p_booking_id
+  returning * into v_booking;
+  if not found then raise exception 'This booking could not be found.'; end if;
   return v_booking;
 end;
 $$;
@@ -296,23 +411,26 @@ as $$
 begin
   if not exists (
     select 1 from public.offerings
-    where id = p_offering_id and owner_id = auth.uid()
+    where id = p_offering_id and (owner_id = auth.uid() or public.is_gather_admin())
   ) then
-    raise exception 'You can only remove your own listing.';
+    raise exception 'You can only remove your own listing or manage listings as an administrator.';
   end if;
   update public.bookings
   set status = 'cancelled'
   where offering_id = p_offering_id and status in ('pending', 'confirmed');
-  delete from public.offerings where id = p_offering_id and owner_id = auth.uid();
+  delete from public.offerings
+  where id = p_offering_id and (owner_id = auth.uid() or public.is_gather_admin());
 end;
 $$;
 
 revoke all on function public.create_booking(text, date, date, integer, text) from public;
 revoke all on function public.cancel_booking(uuid) from public;
+revoke all on function public.update_booking_admin(uuid, text, date, date, integer, integer, text, text, text, text) from public;
 revoke all on function public.delete_offering(text) from public;
 revoke all on function public.get_unavailable_dates() from public;
 grant execute on function public.create_booking(text, date, date, integer, text) to authenticated;
 grant execute on function public.cancel_booking(uuid) to authenticated;
+grant execute on function public.update_booking_admin(uuid, text, date, date, integer, integer, text, text, text, text) to authenticated;
 grant execute on function public.delete_offering(text) to authenticated;
 grant execute on function public.get_unavailable_dates() to anon, authenticated;
 

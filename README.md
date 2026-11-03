@@ -32,7 +32,23 @@ Gather uses Supabase Auth, a shared Postgres database, and Supabase Storage for 
 4. Open the live site and create a new account. If email confirmation is enabled in Supabase, verify the message first, then sign in. Old browser-only accounts and data are not migrated automatically.
 5. Visitors may browse without signing in. Guests must create or sign in to a regular account before sending a request. Anonymous sign-in is not required for the visitor booking flow.
 
-Row-level security limits profile access to its owner, listings to their host for changes, and reservations to the guest and the listing host. Booking creation, date-conflict checks, cancellation, and listing removal run through restricted database functions. Public users can read only confirmed reservation date ranges needed to show availability; guest contact details are not public. Do not disable RLS or add permissive public policies.
+### Provision a site administrator
+
+There is no shared `admin` / `admin` login. Create a normal account for the person who will administer Gather, verify its email if confirmation is enabled, and sign in once so its profile exists. In Supabase **Authentication → Users**, copy that account's user ID. In **SQL Editor**, run the following with that UUID substituted:
+
+```sql
+update public.profiles
+set role = 'admin'
+where id = 'PASTE-THE-ACCOUNT-UUID-HERE';
+
+select id, name, email, role
+from public.profiles
+where id = 'PASTE-THE-ACCOUNT-UUID-HERE';
+```
+
+Confirm the query returns exactly that account with the `admin` role. The admin dashboard then provides access to all listings and booking records, with controls to edit listing and booking details. To revoke access, change that profile's role back to `guest` or `host`. Signup only creates guest or host profiles; clients cannot promote themselves. Keep SQL Editor access and the administrator account credentials private.
+
+Row-level security limits profile access to its owner (or a trusted Gather administrator), listing changes to the listing's host (or an administrator), and reservation access to the guest and listing host (or an administrator). Booking creation, date-conflict checks, cancellation, listing removal, and administrator booking edits run through restricted database functions. Public users can read only confirmed reservation date ranges needed to show availability; guest contact details are not public. Do not disable RLS or add permissive public policies.
 
 ## Gather booking assistant
 
@@ -48,9 +64,9 @@ Groq’s quotas, model availability, and terms can change. Until the function an
 
 The function validates chat history, sends only the conversation and public listing details to the configured provider, and streams its response to the browser. Do not send passwords, payment information, or other sensitive details in chat. For booking assistance, the model can recommend only supplied listings; Gather checks current on-file availability, gathers dates and guests in chat, shows an estimated total, then requires sign-in and explicit confirmation before saving a pending request. Requests are not sent to the property; guests must contact it directly to confirm. Listing preparation continues to use Gather’s guided draft flow and editable listing form.
 
-## Host management
+## Host and administrator management
 
-The existing host/admin area remains available for listing management and review of requests associated with managed listings. Requests are not sent to guests or confirmed in Gather; hosts must contact guests directly to verify dates, rates, and terms.
+Hosts can manage their own listings and review requests associated with them. A trusted site administrator can manage all listings and edit booking details across Gather. Requests are not sent to guests or confirmed in Gather; hosts must contact guests directly to verify dates, rates, and terms.
 
 ## Data and scope
 
