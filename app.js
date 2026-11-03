@@ -1334,6 +1334,10 @@
       }
       return;
     }
+    if (event.target.closest("#guide-demo-details")) {
+      showDemoDisclaimer();
+      return;
+    }
     const accountAction = event.target.closest("[data-account-action]");
     if (accountAction) {
       const action = accountAction.dataset.accountAction;
@@ -1356,6 +1360,15 @@
     if (nav) {
       event.preventDefault();
       navigate(nav.dataset.tabLink);
+      if (nav.dataset.scrollTarget) {
+        window.requestAnimationFrame(() => {
+          const target = document.getElementById(nav.dataset.scrollTarget);
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+          if (nav.dataset.expandMap === "true" && $("#expand-map").getAttribute("aria-expanded") !== "true") {
+            $("#expand-map").click();
+          }
+        });
+      }
       return;
     }
     const category = event.target.closest("[data-category]");
@@ -1412,7 +1425,7 @@
   window.addEventListener("hashchange", () => {
     const route = window.location.hash.slice(1);
     const target = route === "browse" ? "home" : route;
-    if (target && ["home", "search", "bookings", "manage"].includes(target) && target !== activeTab) {
+    if (target && ["home", "search", "bookings", "manage", "guide"].includes(target) && target !== activeTab) {
       navigate(target, false);
     }
   });
@@ -1467,7 +1480,7 @@
     }
     isInitializing = false;
     const initialRoute = window.location.hash.slice(1) === "browse" ? "home" : window.location.hash.slice(1);
-    if (["home", "search", "bookings", "manage"].includes(initialRoute) && initialRoute !== "home") {
+    if (["home", "search", "bookings", "manage", "guide"].includes(initialRoute) && initialRoute !== "home") {
       navigate(initialRoute, false);
     } else {
       navigate("home", false);

@@ -21,6 +21,7 @@
         <div class="header-actions">
           <button class="nav-link host-link" type="button" data-tab-link="manage">List your property <span aria-hidden="true">↗</span></button>
           <button type="button" class="profile-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown"><span class="profile-dot" aria-hidden="true">G</span><span id="account-button-label">Sign in</span></button>
+          <button type="button" class="feature-guide-trigger" data-tab-link="guide" aria-label="Explore everything in Gather" title="Explore everything in Gather">▦</button>
         </div>
       </header>
       <aside class="demo-mode-notice" aria-label="Presentation demo notice">
@@ -152,6 +153,53 @@
           <div class="page-intro manage-intro"><div><p class="eyebrow">FOR PEOPLE WHO HAVE A PLACE TO SHARE</p><h1 id="manage-title">Your place, <em>their story.</em></h1><p>Manage your space, set your availability, welcome someone new.</p></div><button type="button" class="button button-dark" id="add-offering-button"><span aria-hidden="true">＋</span> Add your place</button></div>
           <div class="manage-layout"><div class="manage-panel"><div class="panel-heading"><div><p class="eyebrow">YOUR LITTLE CORNER OF GATHER</p><h2>Places you host</h2></div><span class="soft-badge" id="offering-count">0 places</span></div><div id="manage-offerings"></div></div><aside class="manage-note"><span class="note-icon" aria-hidden="true">✳</span><h3>Good hosting starts before they arrive.</h3><p>Share what makes your place special, set the nights you welcome guests, and we’ll keep the calendar tidy.</p><span class="note-foot">GOOD PLACES FIND THEIR PEOPLE.</span></aside></div>
           <section class="host-reservations"><div class="section-heading"><div><p class="eyebrow">THE PEOPLE COMING TO STAY</p><h2>Guest <em>reservations.</em></h2></div></div><div class="booking-list" id="host-booking-list"></div><div class="host-empty" id="host-booking-empty">New reservations for your places will show up here.</div></section>
+        </section>
+
+        <section class="view feature-guide-view" id="guide-view" aria-labelledby="guide-title" hidden>
+          <div class="feature-guide-intro">
+            <p class="eyebrow">A QUICK TOUR OF GATHER</p>
+            <h1 id="guide-title">Everything, <em>in one place.</em></h1>
+            <p>Open a section to see what you can do. Each card takes you straight to that part of Gather.</p>
+          </div>
+          <div class="feature-guide-groups">
+            <details class="feature-guide-group" open>
+              <summary><span class="guide-summary-icon" aria-hidden="true">⌕</span><span class="guide-summary-copy"><strong>Find your next stay</strong><small>Explore destinations, compare places, and save favourites</small></span><span class="guide-count">6 features</span></summary>
+              <div class="guide-card-grid">
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">⌕</span><h2>Search by your plans</h2><p>Look by Philippine destination, check-in and check-out dates, and guest count—including groups of up to 20.</p><a href="#search" data-tab-link="search">Start a search <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">✦</span><h2>Browse destinations</h2><p>Discover stays across islands, coastlines, cities, mountain escapes, heritage towns, and more.</p><a href="#search" data-tab-link="search">Explore destinations <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">☷</span><h2>Filter and compare</h2><p>Sort Gather picks by price, rating, or reviews. Narrow the results by stay type, nightly budget, and guest rating.</p><a href="#search" data-tab-link="search">Compare stays <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">♡</span><h2>Keep favourite places</h2><p>Save stays to your account and filter your search to see your favourites together.</p><a href="#search" data-tab-link="search">Find a favourite <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card guide-card-map"><span class="guide-card-icon" aria-hidden="true">⌖</span><h2>Explore the interactive map</h2><p>See approximate stay locations on the Philippines map. Click a marker to open a place, or expand the map for a closer look.</p><a href="#search" data-tab-link="search" data-scroll-target="stay-map" data-expand-map="true">Open and expand map <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">▧</span><h2>See the details</h2><p>Open a stay to review its description, amenities, guest capacity, nightly price, and date options before booking.</p><a href="#search" data-tab-link="search">View available stays <span aria-hidden="true">→</span></a></article>
+              </div>
+            </details>
+            <details class="feature-guide-group">
+              <summary><span class="guide-summary-icon" aria-hidden="true">✓</span><span class="guide-summary-copy"><strong>Plan and manage trips</strong><small>Check availability, confirm a stay, and review your bookings</small></span><span class="guide-count">3 features</span></summary>
+              <div class="guide-card-grid">
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">◷</span><h2>Check dates and availability</h2><p>Gather checks dates, capacity, minimum nights, and overlapping reservations before preparing a booking.</p><a href="#search" data-tab-link="search">Check a stay <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">₱</span><h2>Review the booking total</h2><p>See the nightly price, number of nights, and total before you decide. Nothing is saved until you explicitly confirm.</p><a href="#search" data-tab-link="search">Choose a place <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">▤</span><h2>View and manage your trips</h2><p>See your booking details and status in My trips. Cancel eligible demo reservations to release those dates.</p><a href="#bookings" data-tab-link="bookings">Open My trips <span aria-hidden="true">→</span></a></article>
+              </div>
+            </details>
+            <details class="feature-guide-group">
+              <summary><span class="guide-summary-icon" aria-hidden="true">⌂</span><span class="guide-summary-copy"><strong>Host a place</strong><small>Create a listing and manage availability and reservations</small></span><span class="guide-count">4 features</span></summary>
+              <div class="guide-card-grid">
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">＋</span><h2>Create a property listing</h2><p>Add a place name, category, location, capacity, nightly price, description, photo, and amenities.</p><a href="#manage" data-tab-link="manage">Go to host tools <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">⌖</span><h2>Pin an approximate location</h2><p>Choose your place on the Philippines map or enter its coordinates for an approximate public map marker.</p><a href="#manage" data-tab-link="manage">Open host tools <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">▦</span><h2>Set availability</h2><p>Choose available check-in days and minimum nights, then update listing details as your place changes.</p><a href="#manage" data-tab-link="manage">Manage availability <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">☷</span><h2>Review guest reservations</h2><p>Manage your hosted listings and see guest reservations associated with your places.</p><a href="#manage" data-tab-link="manage">View host dashboard <span aria-hidden="true">→</span></a></article>
+              </div>
+            </details>
+            <details class="feature-guide-group">
+              <summary><span class="guide-summary-icon" aria-hidden="true">✳</span><span class="guide-summary-copy"><strong>Get help from Gather</strong><small>Chat with the booking agent and learn about this presentation</small></span><span class="guide-count">3 features</span></summary>
+              <div class="guide-card-grid">
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">g</span><h2>Chat with the AI booking agent</h2><p>Ask naturally for Philippine stay ideas, get suggestions from Gather’s listings, or prepare a listing draft.</p><a href="#home" data-tab-link="home" data-scroll-target="trip-chat">Open Gather chat <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">◉</span><h2>Use a guest or host demo account</h2><p>Try the presentation with demo guest or host access. Sign-in requirements and available features depend on your account.</p><a href="#home" data-tab-link="home">Return to Gather <span aria-hidden="true">→</span></a></article>
+                <article class="guide-card"><span class="guide-card-icon" aria-hidden="true">ⓘ</span><h2>Know what is a demo</h2><p>Listings, prices, availability, and bookings are examples; Gather does not reserve real accommodation or process payments.</p><button type="button" class="guide-text-button" id="guide-demo-details">Read demo details <span aria-hidden="true">→</span></button></article>
+              </div>
+            </details>
+          </div>
+          <p class="feature-guide-note">Gather is a Philippines-focused booking experience. Stay information and reservations in this presentation are examples, not live travel offers.</p>
         </section>
       </main>
     </div>

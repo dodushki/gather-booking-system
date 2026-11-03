@@ -169,6 +169,9 @@
             assert(dataScript.includes("functions/v1/gather-chat") && !markup.includes("GATHER_AI_API_KEY"), "The AI provider secret must stay on the server and never appear in the website");
             assert(appScript.includes("window.GatherChatListingDraft") && appScript.includes("window.GatherChatBookingPreferences") && appScript.includes("GatherChatActions"), "Assistant actions should connect to Gather’s booking and editable listing flows");
             assert(styles.includes(".trip-chat {") && styles.includes(".trip-chat-form { grid-template-columns: 1fr; }"), "The assistant should remain usable on mobile-sized screens");
+            assert(markup.includes('id="guide-view"') && markup.includes('class="feature-guide-trigger"') && markup.includes("<details class=\"feature-guide-group\""), "The quiet top-corner feature guide should provide expandable sections");
+            assert(markup.includes('data-scroll-target="stay-map"') && markup.includes('data-expand-map="true"') && appScript.includes('"guide"].includes(initialRoute)'), "The feature guide should link to and expand the interactive map, and its route should be shareable");
+            assert(styles.includes("feature-guide-view") && styles.includes("--green: #28796b") && styles.includes("--sans:"), "The feature guide and refreshed color and typography system should be styled");
           });
           await testAsync("streams real AI replies through the authenticated Supabase proxy", async function () {
             const source = await (await fetch("./supabase-data.js")).text();
